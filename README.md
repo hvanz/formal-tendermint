@@ -8,6 +8,7 @@ Formal specifications and model checking for Tendermint-style consensus algorith
 ## Protocols
 
 - [Fast Tendermint](fast-tendermint/README.md) — consensus in two communication steps, tolerating `f < n/5` Byzantine processes
+- [Tendermint](tendermint/tla/README.md) — TLA+ specifications of single-height consensus, with TLAPS proofs of agreement, validity, integrity, and termination
 
 ## Research Context
 

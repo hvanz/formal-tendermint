@@ -1,0 +1,10 @@
+# TLC working directory (fingerprint storage, recreated on every run)
+states/
+
+# TLC trace exploration output
+*.dot
+*.dot.pdf
+
+# TLAPS proof cache
+.tlacache/
+
