@@ -1,9 +1,9 @@
 # TLA+ specs and proofs of Tendermint
 
-This repository holds four TLA+ specifications of Tendermint single-height consensus.
+This repository holds four TLA+ specifications of Tendermint consensus algorithm
 It also holds TLAPS-checked proofs of three safety properties (agreement, validity, integrity) and of liveness (termination).
 
-The specifications follow Algorithm 1 of [The latest gossip on BFT consensus][tendermint-paper].
+The specifications follow Algorithm 1 of main reference for the algorithm: [The latest gossip on BFT consensus][tendermint-paper].
 The protocol is split across four abstraction levels.
 Each level adds one group of self-contained features.
 The split keeps the agreement proof at the most abstract level, where the state is smallest.
@@ -15,7 +15,7 @@ Four properties are completely proved: Agreement, Validity, Integrity, and Termi
 
 ### Safety
 
-The four specifications form this refinement chain:
+There are four specifications forming a refinement chain:
 
 ```text
 TendermintVoting <- TendermintOperational <- TendermintByzantine <- TendermintPartialSync
@@ -25,7 +25,7 @@ TendermintVoting <- TendermintOperational <- TendermintByzantine <- TendermintPa
 refinement mapping, is a behavior of `A`. Specification `A` is the more
 abstract one. Specification `B` is the more concrete one.
 
-The three safety properties are proved once on `TendermintVoting`, in `TendermintVotingProofs`.
+The safety properties properties are proved once on the `TendermintVoting` model, in `TendermintVotingProofs`.
 Three refinement proofs then transfer them down to `TendermintPartialSync`.
 At the two lower levels, the properties hold for honest validators.
 

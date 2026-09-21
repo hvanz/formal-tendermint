@@ -1,12 +1,12 @@
-# Tendermint agreement proof
+# Agreement proof
 
-This document describes the TLAPS proof that honest Tendermint validators
-cannot decide different values at one consensus height.
+This document describes the proof for Agreement: honest validators
+cannot decide on different values in a Tendermint height.
 
 ## Result
 
-The most concrete specification is `TendermintPartialSync.tla`. Its agreement
-theorem is:
+The most concrete specification is `TendermintPartialSync`.
+Its Agreement theorem is:
 
 ```tla
 THEOREM AgreementInv == Spec => []Agreement
@@ -26,12 +26,13 @@ Agreement is proved once on `TendermintVoting`, then transferred to `TendermintP
 
 ## Voting proof
 
-`TendermintVoting.tla` retains only proposals, votes, locks, and decisions.
-Operational round and step state is removed. Guards directly encode vote
-uniqueness, the requirement that a precommit follows a prevote quorum, and the
-proof-of-lock rule.
+`TendermintVoting` contain only proposals, votes, locks, and decisions.
+The validators' round and step state is disregarded.
+Guards directly encode vote uniqueness,
+the requirement that a `PRECOMMIT` requires a `PREVOTE` quorum,
+and the _Proof-Of-Lock_ (PoL) rule.
 
-`TendermintVotingProofs.tla` establishes:
+`TendermintVotingProofs` establishes that:
 
 1. A decision has a corresponding precommit quorum.
 2. A precommit quorum has a corresponding prevote quorum, called a polka.
@@ -44,11 +45,11 @@ lock-chain argument corresponding to the Tendermint paper's safety reasoning.
 
 ## Protocol refinement
 
-`TendermintOperational.tla` adds per-validator rounds, protocol steps,
-proposal handling, valid values, and round advancement. It remains all honest
-and uses symbolic quorums.
+`TendermintOperational` adds per-validator rounds, protocol steps,
+proposal handling, valid values, and round advancement.
+It assumes honest validators only and uses symbolic quorums.
 
-`TendermintOperationalRefinement.tla` maps `sent`, `locked`, and `decision`
+`TendermintOperationalRefinement` maps `sent`, `locked`, and `decision`
 directly to the voting specification. Operational state not visible in the
 voting layer maps to stuttering. The module proves:
 
@@ -58,10 +59,10 @@ THEOREM AgreementInv == Spec => []Agreement
 
 ## Byzantine refinement
 
-`TendermintByzantine.tla` adds faulty validators, Byzantine quorums, designated
+`TendermintByzantine` adds faulty validators, Byzantine quorums, designated
 proposers, and a permissive faulty action.
 
-`TendermintByzantineRefinement.tla` projects the behavior onto honest validator
+`TendermintByzantineRefinement` projects the behavior onto honest validator
 state:
 
 * Proposals are kept after removing their sender.
@@ -79,24 +80,24 @@ the operational module's agreement theorem; no direct edge onto
 
 ## Partial synchrony refinement
 
-`TendermintPartialSync.tla` adds concrete quorum cardinalities, timers,
+`TendermintPartialSync` adds concrete quorum cardinalities, timers,
 per-validator received sets, message delivery, GST, Delta, and a numeric
 clock.
 
-`TendermintPartialSyncRefinement.tla` projects timer, delivery, and clock
+`TendermintPartialSyncRefinement` projects timer, delivery, and clock
 state away. Its invariant proves that each honest received set is a subset of
 the derived global message pool. Monotonicity then maps local-message guards
-to the matching global guards in `TendermintByzantine.tla`.
+to the matching global guards in `TendermintByzantine`.
 
-This final refinement establishes Agreement for the paper-level protocol model.
+This final refinement establishes `Agreement` for the paper-level protocol model.
 
 ## Assumptions
 
 The proof depends on:
 
 * A nonempty validator set and at least one honest validator.
-* An application validity predicate over proposed values.
-* Authenticated senders, so faulty validators cannot forge honest votes.
+* An application validity predicate `valid()` over proposed values.
+* Authenticated messages, so faulty validators cannot forge honest votes.
 * Symbolic quorum intersection in the honest layers.
 * Honest intersection of Byzantine quorums in the Byzantine layer.
 * The concrete `3f+1`, `2f+1`, and `f+1` quorum assumptions in the partial synchrony layer.
