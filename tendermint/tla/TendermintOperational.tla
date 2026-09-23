@@ -207,12 +207,8 @@ PrecommitsAt(v, r) == { m \in SentPrecommits : m.round = r /\ m.valueID = v }
 PrevoteSendersFor(v, r)   == { m.sender : m \in PrevotesAt(v, r) }
 PrecommitSendersFor(v, r) == { m.sender : m \in PrecommitsAt(v, r) }
 
-SendersOfTypeAtRound(t, r) == { m.sender : m \in { x \in sent : x.type = t /\ x.round = r } }
-
 ExistsPrevoteQuorum(v, r)   == \E Q \in Quorum : Q \subseteq PrevoteSendersFor(v, r) \* a polka
 ExistsPrecommitQuorum(v, r) == \E Q \in Quorum : Q \subseteq PrecommitSendersFor(v, r)
-ExistsAnyPrevoteQuorum(r)   == \E Q \in Quorum : Q \subseteq SendersOfTypeAtRound("Prevote", r)
-ExistsAnyPrecommitQuorum(r) == \E Q \in Quorum : Q \subseteq SendersOfTypeAtRound("Precommit", r)
 
 \* Some message (proposal or vote) was sent at round r. Sender-agnostic: a
 \* proposal carries no sender, and one message is already evidence the round
