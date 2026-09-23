@@ -51,20 +51,20 @@ It assumes honest validators only and uses symbolic quorums.
 
 `TendermintOperationalRefinement` maps `sent`, `locked`, and `decision`
 directly to the voting specification, via the `Refinement` theorem.
-`TendermintOperational` adds state variables — round, step, and others — that
-do not exist in `TendermintVoting`.
+`TendermintOperational` adds state variables (`round`, `step`, and others) that do not exist in `TendermintVoting`.
 When the operational model takes a step that changes only those variables,
 without touching votes, locks, or decisions, the voting layer sees no change.
 In TLA+, such a transition maps to a _stuttering step_: a transition where the
 abstract state is unchanged.
 
 ```tla
-THEOREM Refinement == Spec => V!Spec
+THEOREM AgreementInv == Spec => V!Spec
 ```
 
 The proof is a per-action simulation.
 Each operational action either matches an abstract action or stutters.
 `AgreementInv` then follows by temporal logic, since `Agreement` mentions only `decision`, mapped by the identity.
+
 ## Byzantine refinement
 
 `TendermintByzantine` adds faulty validators, Byzantine quorums, designated
@@ -121,5 +121,4 @@ From the repository root:
 make agreement
 ```
 
-This checks the four proof modules in order. Measured durations and obligation
-counts are in [proof-results.md](./proof-results.md).
+This checks the four proof modules in order.
