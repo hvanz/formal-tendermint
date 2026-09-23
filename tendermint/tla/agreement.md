@@ -34,11 +34,11 @@ and the _Proof-Of-Lock_ (PoL) rule.
 
 `TendermintVotingProofs` establishes that:
 
-1. A decision has a corresponding precommit quorum.
-2. A precommit quorum has a corresponding prevote quorum, called a polka.
-3. `PolkaDescent` prevents a higher-round polka from changing value above an earlier precommit quorum.
+1. A decision has a corresponding `PRECOMMIT` quorum.
+2. A `PRECOMMIT` quorum has a corresponding `PREVOTE` quorum, also known as  a _polka_.
+3. `PolkaDescent` prevents a higher-round _polka_ from changing value above an earlier `PRECOMMIT` quorum.
 4. `PrecommitQuorumAgreement` follows across all rounds.
-5. `AgreementInv == Spec => []Agreement` follows from decision certificates and precommit quorum agreement.
+5. `AgreementInv == Spec => []Agreement` follows from decision certificates and `PRECOMMIT` quorum agreement.
 
 The cross-round step uses course-of-values induction. This is the formal
 lock-chain argument corresponding to the Tendermint paper's safety reasoning.
@@ -50,13 +50,21 @@ proposal handling, valid values, and round advancement.
 It assumes honest validators only and uses symbolic quorums.
 
 `TendermintOperationalRefinement` maps `sent`, `locked`, and `decision`
-directly to the voting specification. Operational state not visible in the
-voting layer maps to stuttering. The module proves:
+directly to the voting specification, via the `Refinement` theorem.
+`TendermintOperational` adds state variables — round, step, and others — that
+do not exist in `TendermintVoting`.
+When the operational model takes a step that changes only those variables,
+without touching votes, locks, or decisions, the voting layer sees no change.
+In TLA+, such a transition maps to a _stuttering step_: a transition where the
+abstract state is unchanged.
 
 ```tla
-THEOREM AgreementInv == Spec => []Agreement
+THEOREM Refinement == Spec => V!Spec
 ```
 
+The proof is a per-action simulation.
+Each operational action either matches an abstract action or stutters.
+`AgreementInv` then follows by temporal logic, since `Agreement` mentions only `decision`, mapped by the identity.
 ## Byzantine refinement
 
 `TendermintByzantine` adds faulty validators, Byzantine quorums, designated

@@ -1,17 +1,25 @@
 # TLA+ specs and proofs of Tendermint
 
 This repository holds four TLA+ specifications of Tendermint consensus algorithm
-It also holds TLAPS-checked proofs of three safety properties (agreement, validity, integrity) and of liveness (termination).
+and TLAPS-checked proofs of its properties: Agreement, Validity, Integrity ([safety](#safety)) and Termination ([liveness](#liveness)).
 
 The specifications follow Algorithm 1 of main reference for the algorithm: [The latest gossip on BFT consensus][tendermint-paper].
+The specification considers a single height of consensus: sice Tendermint executes one height at a time, it does cover all relevant behaviour.
+
 The protocol is split across four abstraction levels.
 Each level adds one group of self-contained features.
-The split keeps the agreement proof at the most abstract level, where the state is smallest.
-Termination is proved at the most concrete level spec, which models the protocol in the partial synchrony model.
+The split keeps the Agreement proof at the most abstract level, where the state is smallest.
+Termination is proved at the most concrete level spec, which models the protocol as in the paper: _Partial Synchrony_ augmented with the _Gossip Communication_ property.
 
 ## Status
 
-Four properties are completely proved: Agreement, Validity, Integrity, and Termination.
+The following properties are proved:
+
+- **Agreement**: No two correct processes decide on different values. *(Safety)*
+- **Integrity**: Once a process decides a value, the decision value never changes. *(Safety)*
+- **Termination**: All correct processes eventually decide on a value. *(Liveness)*
+- **Validity**: A decided value is valid, i.e., it satisfies the predefined predicate denoted `valid()`. *(Safety)*
+
 
 ### Safety
 
@@ -26,15 +34,16 @@ refinement mapping, is a behavior of `A`. Specification `A` is the more
 abstract one. Specification `B` is the more concrete one.
 
 The safety properties properties are proved once on the `TendermintVoting` model, in `TendermintVotingProofs`.
-Three refinement proofs then transfer them down to `TendermintPartialSync`.
+The refinement proofs then transfer them down to `TendermintPartialSync`.
 At the two lower levels, the properties hold for honest validators.
 
-### Termination
+### Liveness
 
 Termination is a liveness property. Refinement onto a more abstract
 specification does not transfer it downwards. Termination is therefore proved
-directly on `TendermintPartialSync`. That level is the only one with timers, a
-numeric clock, GST, and Delta. The theorem is:
+directly on `TendermintPartialSync`, the only level with timers, a
+numeric clock, `GST`, and `Δ`, modelling the Partially Synchronous model.
+The theorem, that lives in `TendermintPartialSyncTermination`, is:
 
 ```tla
 THEOREM TerminationThm == Spec => Termination
@@ -63,8 +72,9 @@ The termination modules add no axiom of their own.
 
 ## Scope
 
-The specifications cover one consensus height. They do not model validator set
-changes, accountability, application execution, or networking outside the
+The specifications cover one consensus height with a fixed set of participants.
+They do not model validator set
+changes over heights, accountability, application execution, or networking outside the
 message delivery assumptions of the paper protocol.
 
 ## Repository layout
@@ -74,27 +84,31 @@ and every `.cfg` configuration.
 
 ### Specifications
 
+There are four specifications forming a refinement chain, from most abstract to most concrete:
 * [`TendermintVoting.tla`](./TendermintVoting.tla): abstract voting and lock
-  discipline
-* [`TendermintOperational.tla`](./TendermintOperational.tla): leaderless
-  operational round and step protocol
-* [`TendermintByzantine.tla`](./TendermintByzantine.tla): Byzantine validators
+  discipline, the core components that ensure Agreement
+* [`TendermintOperational.tla`](./TendermintOperational.tla): per-validator
+    round and step state machine with leaderless proposals
+* [`TendermintByzantine.tla`](./TendermintByzantine.tla): Byzantine fault model
+  with faulty validators, authenticated faults, and designated proposers
   and designated proposers
 * [`TendermintPartialSync.tla`](./TendermintPartialSync.tla): paper-level
-  timers, delivery, and partial synchrony
+  spec with timers, concrete quorums, and partial synchrony; bottom of the
+  refinement chain
 
 ### Safety proofs
 
+Introduced in the `TendermintVoting` model, with refinements proved down to `TendermintPartialSync`:
 * [`TendermintVotingProofs.tla`](./TendermintVotingProofs.tla)
 * [`TendermintOperationalRefinement.tla`](./TendermintOperationalRefinement.tla)
 * [`TendermintByzantineRefinement.tla`](./TendermintByzantineRefinement.tla)
 * [`TendermintPartialSyncRefinement.tla`](./TendermintPartialSyncRefinement.tla)
 
-[`agreement.md`](./agreement.md) describes the agreement argument of these four modules.
+The companion [`agreement.md`](./agreement.md) describes how the proof is constructed using these four modules.
 
-### Termination proof
+### Liveness proof
 
-The termination proof is split into 13 modules. Each module trusts the theorem
+The Termination proof is split into 13 modules. Each module trusts the theorem
 statements of the modules that it extends, and re-checks its own obligations
 only. An edit in one module therefore does not re-check the whole proof.
 
@@ -194,19 +208,21 @@ Names above omit the `TendermintPartialSync` prefix.
 The final agreement refinement is also a dependency of the termination proof
 and is listed only in the agreement table.
 
-## Installing the tools
+## Tools
 
-Two tools are needed. `tlapm` is the TLA+ Proof System (TLAPS), and it checks
+Two tools are needed:  `tlapm` and TLC.
 the proofs. TLC is part of the TLA+ tools, and it runs the bounded model checks.
 
-### TLAPS (tlapm)
+### tlapm
+TLA⁺ Proof Manager: the tool that mechanically checks proofs,
+part of TLA⁺ Proof System, or TLAPS.
 
-TLAPS publishes prebuilt binaries on its releases page. Download the archive
-for your platform. Unpack it. Add the `bin` directory of the result to `PATH`.
+Prebuilt binaries are published in https://github.com/tlaplus/tlapm/releases.
+Download the archive for your platform and unpack it.
+Add the unpacked `bin/` directory to the `PATH`.
 
-<https://github.com/tlaplus/tlapm/releases>
 
-The install includes `tlapm`, the TLAPS standard proof modules, and the backend
+The archive includes `tlapm`, the TLAPS standard proof modules, and the backend
 provers that `make` invokes. The backends are Zenon, Isabelle, and an SMT
 solver. Check the installation:
 
@@ -218,22 +234,24 @@ tlapm --where    # prints the standard-library location
 To build from source instead, follow the instructions in the repository. The
 build needs OCaml and opam: <https://github.com/tlaplus/tlapm>.
 
-### TLC (TLA+ tools)
+### TLC
+
+Tool that checks TLA⁺ models: bounded state-space exploration.
 
 TLC needs Java 11 or later. Download `tla2tools.jar` from the releases page:
-
 <https://github.com/tlaplus/tlaplus/releases>
 
 TLC also needs the TLAPS standard library on its module search path.
 Some specifications extend the `TLAPS` module, and `tla2tools.jar` does not carry that module.
-Give the path in the `TLA-Library` system property.
+So pass its location to the `TLA-Library` system property:
 
 ```bash
 java -DTLA-Library=$(tlapm --where) -jar /path/to/tla2tools.jar \
   -config TendermintVotingMC.cfg TendermintVotingMC.tla
 ```
 
-The `make tlc` target sets the property for you (see [Verification](#verification)).
+The `make tlc` target sets the property for you (see [Verification](#verification)),
+using the `TLA2TOOLS` variable.
 Alternatively, put the property in a shell alias if you want a short command:
 
 ```bash
@@ -242,7 +260,7 @@ alias tlc='java -DTLA-Library=$(tlapm --where) -jar /path/to/tla2tools.jar'
 
 ### Versions used
 
-These proofs were checked with:
+The proofs were checked with:
 
 * `tlapm` commit `fd3988f`, built with OCaml 5.1.0. The backends were
   Isabelle2025, Zenon 0.8.4, and Z3 4.8.9 for SMT.
@@ -254,7 +272,7 @@ recorded results.
 ## Verification
 
 Put `tlapm` on `PATH` first. See [Installing the
-tools](#installing-the-tools). Then run one of these targets:
+Then run one of these targets:
 
 ```bash
 make              # both chains, safety first
@@ -276,7 +294,7 @@ tlapm --nofp TendermintVotingProofs.tla
 ```
 
 To run a TLC model, use the `tlc` target. `MC` gives the module, and `CFG` gives
-the configuration. Neither name carries an extension. `CFG` defaults to `MC`:
+the configuration (defaults to `MC` when empty).  Neither name carries a file extension.
 
 ```bash
 make tlc MC=TendermintVotingMC
@@ -284,8 +302,8 @@ make tlc MC=TendermintPartialSyncTerminationWithinRoundMC \
   CFG=TendermintPartialSyncTerminationWithinRoundLockRetry
 ```
 
-The target sets the TLAPS search path from `tlapm --where`. It expects the jar
-at `$HOME/bin/tla2tools.jar`. Give `TLA2TOOLS=/path/to/tla2tools.jar` for
-another location.
+The target sets the TLAPS library path from `tlapm --where`.
+The `TLA2TOOLS` variable configures the location of the downloaded `tla2tools.jar`;
+the default value is `$HOME/bin/tla2tools.jar`.
 
 [tendermint-paper]: https://arxiv.org/abs/1807.04938
