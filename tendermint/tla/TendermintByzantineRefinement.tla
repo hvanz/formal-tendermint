@@ -31,7 +31,7 @@
 (*   An equivocating proposer can split honest prevotes across values, but *)
 (*   two values cannot both reach a polka in one round (each honest        *)
 (*   validator prevotes once; two polkas need 2(f+1) > 2f+1 honest         *)
-(*   prevoters). So Agreement/Validity/Integrity (honest-scoped) still     *)
+(*   prevoters). So Agreement/Validity (honest-scoped) still               *)
 (*   hold; they transfer along the chain                                   *)
 (*     TendermintVoting <- TendermintOperational <- TendermintByzantine,   *)
 (*   reusing the safety theorems TendermintOperationalRefinement already   *)
@@ -40,10 +40,10 @@
 (* MAIN RESULTS                                                            *)
 (* - THEOREM Refinement == Spec => P!Spec (the linear-chain edge, onto the *)
 (*   leaderless TendermintOperational).                                    *)
-(* - THEOREM AgreementInv / ValidityInv / IntegrityInv: honest-scoped      *)
-(*   safety of TendermintByzantine, each proved by transitivity Spec =>    *)
-(*   P!Spec => []P!<prop>, reusing TendermintOperationalRefinement's       *)
-(*   already-proven safety theorems.                                       *)
+(* - THEOREM AgreementInv / ValidityInv: honest-scoped safety of           *)
+(*   TendermintByzantine, each proved by transitivity Spec => P!Spec =>    *)
+(*   []P!<prop>, reusing TendermintOperationalRefinement's already-proven  *)
+(*   safety theorems.                                                      *)
 (*                                                                         *)
 (* The two honest-scoped bridge invariants on TendermintByzantine (TypeOK, *)
 (*   VoteStepProgress) are proved here by induction: the honest-sender     *)
@@ -78,7 +78,7 @@ ProjByz == { Strip(m) : m \in { x \in sent : Kept(x) } }
 \* instance TendermintOperationalRefinement (which EXTENDS
 \* TendermintOperational and already proves its honest-independent safety by
 \* refinement onto TendermintVoting), so P!Spec, every P!... operator, AND
-\* its P!AgreementInv / P!ValidityInv / P!IntegrityInv safety theorems are
+\* its P!AgreementInv / P!ValidityInv safety theorems are
 \* all in scope; the honest projection only needs the spec's CONSTANT
 \* assumptions (discharged below). The per-honest-validator
 \* round/step/locked/valid/decision map by identity (TendermintByzantine
@@ -349,8 +349,8 @@ LEMMA ConstantAssumptions ==
   BY HonestNonEmpty, ValidIsBoolean, ValidNonEmpty, <1>1, <1>2
 
 (***************************************************************************)
-(* End-to-end transfer: honest-scoped Agreement / Validity / Integrity     *)
-(* follow by TRANSITIVITY along the linear chain -- Spec => P!Spec         *)
+(* End-to-end transfer: honest-scoped Agreement / Validity follow by       *)
+(* TRANSITIVITY along the linear chain -- Spec => P!Spec                   *)
 (* (Refinement), then P!Spec => []P!<prop> reusing                         *)
 (* TendermintOperationalRefinement's already-proven safety theorems        *)
 (* (P!AgreementInv etc., which in turn refine onto TendermintVoting). The  *)

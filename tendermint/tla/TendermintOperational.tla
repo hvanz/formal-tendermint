@@ -2,7 +2,7 @@
 (***************************************************************************)
 (* High-level, operational TLA+ spec of Tendermint: it keeps the           *)
 (* per-validator state machine (round and step) that drives the protocol,  *)
-(* and derives the safety properties (Agreement, Validity, Integrity) by   *)
+(* and derives the safety properties (Agreement, Validity) by              *)
 (* refinement from the TendermintVoting spec.                              *)
 (*                                                                         *)
 (* STATE (six variables; the first five are per-validator functions)       *)

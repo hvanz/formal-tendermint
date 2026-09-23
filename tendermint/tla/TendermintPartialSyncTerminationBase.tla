@@ -110,7 +110,7 @@ WRDurable(r) ==
 (*                                                                         *)
 (* The safety part is inherited word for word from                         *)
 (* TendermintPartialSyncRefinement, and there is nothing to prove again.   *)
-(* That part is TypeOK, RcvdSubsetSent, IntegrityStep, Agreement and the   *)
+(* That part is TypeOK, RcvdSubsetSent, Agreement and the                  *)
 (* rest. The new content is the bookkeeping of the clock and of the        *)
 (* messages that the liveness layers need. Time never goes backwards, and  *)
 (* a message that is sent stays sent, so the Voted* predicates are         *)

@@ -15,7 +15,7 @@
 (*   about the messages, the decision and the delivery, and HonestFinite.  *)
 (*   It EXTENDS TendermintPartialSyncRefinement, so the discharged safety  *)
 (*   results are in scope by name throughout. Those results are InvProof,  *)
-(*   IntegrityInv, []IntegrityStep, and the Mono* and SentExtend lemmas.   *)
+(*   and the Mono* and SentExtend lemmas.                                  *)
 (* - TendermintPartialSyncTerminationWithinRound holds the within-round    *)
 (*   safety support for the repaired case split of paper Lemma 5.          *)
 (* - TendermintPartialSyncTerminationCascade holds the quantitative        *)

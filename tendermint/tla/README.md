@@ -1,7 +1,7 @@
 # TLA+ specs and proofs of Tendermint
 
 This repository holds four TLA+ specifications of Tendermint consensus algorithm
-and TLAPS-checked proofs of its properties: Agreement, Validity, Integrity ([safety](#safety)) and Termination ([liveness](#liveness)).
+and TLAPS-checked proofs of its properties: Agreement, Validity ([safety](#safety)) and Termination ([liveness](#liveness)).
 
 The specifications follow Algorithm 1 of main reference for the algorithm: [The latest gossip on BFT consensus][tendermint-paper].
 The specification considers a single height of consensus: since Tendermint executes one height at a time, it does cover all relevant behaviour.
@@ -17,7 +17,6 @@ The following properties are proved:
 
 - **Agreement**: No two correct processes decide on different values. _(Safety)_
 - **Validity**: A decided value is valid, i.e., it satisfies the predefined predicate denoted `valid()`. _(Safety)_
-- **Integrity**: Once a process decides a value, the decision value never changes. _(Safety)_
 - **Termination**: All correct processes eventually decide on a value. _(Liveness)_
 
 ### Safety

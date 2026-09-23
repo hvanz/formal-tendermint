@@ -5,7 +5,7 @@
 (*   TendermintVoting <- TendermintOperational <- TendermintByzantine <-   *)
 (*   TendermintPartialSync.                                                *)
 (* (B <- A reads "B refines A".) The spec exists to carry a short TLAPS    *)
-(* proof of the safety properties (Agreement, Validity, Integrity) that    *)
+(* proof of the safety properties (Agreement, Validity) that               *)
 (* the lower specs then inherit by refinement. It follows Lamport's        *)
 (* voting refinement pattern used in his Paxos spec.                       *)
 (*                                                                         *)

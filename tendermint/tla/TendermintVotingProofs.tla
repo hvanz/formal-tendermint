@@ -1,7 +1,7 @@
 ----------------------- MODULE TendermintVotingProofs -----------------------
 (***************************************************************************)
 (* TLAPS proof of the safety properties of the abstract TendermintVoting   *)
-(* spec: TypeOK, Validity, Integrity, and Agreement.                       *)
+(* spec: TypeOK, Validity, and Agreement.                                  *)
 (*                                                                         *)
 (* - Agreement reduces to PrecommitQuorumAgreement (two precommit quorums  *)
 (*   decide the same value), the lock-chain core, which in turn reduces to *)
