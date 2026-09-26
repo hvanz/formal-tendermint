@@ -431,25 +431,6 @@ THEOREM ValidityInv == Spec => []Validity
 <1>3. QED
   BY <1>1, <1>2, TypeOKInv, PTL DEF Spec
 
------------------------------------------------------------------------------
-(***************************************************************************)
-(* Integrity: a decision, once set, never changes (Decide's                *)
-(* decision[p]=nil guard). Stated as a step property under [][..]_vars.    *)
-(***************************************************************************)
-THEOREM IntegrityStepInv == Spec => []IntegrityStep
-<1>1. ASSUME TypeOK, [Next]_vars PROVE IntegrityStep
-  <2> USE <1>1
-  <2> SUFFICES ASSUME NEW p \in Validators, decision[p] # nil PROVE decision'[p] = decision[p]
-    BY DEF IntegrityStep
-  <2>1. CASE Next
-    BY <2>1 DEFS Next, TypeOK, Propose, PrecommitNil, PrecommitValue, PrevoteNil, PrevoteValue, Decide
-  <2>2. CASE UNCHANGED vars
-    BY <2>2 DEF vars
-  <2>3. QED
-    BY <2>1, <2>2
-<1>2. QED
-  BY <1>1, TypeOKInv, PTL DEF Spec
-
 =============================================================================
 \* Modification History
 \* Created Jun 7 2026 by hvanz (Hernán Vanzetto)

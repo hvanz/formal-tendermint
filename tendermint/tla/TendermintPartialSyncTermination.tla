@@ -357,14 +357,14 @@ LEMMA CertDecStartBox ==
 <1> QED
   BY <1>1, PTL
 
-\* A boxed single decision step, which is the step of DecLatch at a fixed c.
+\* A boxed single decision step, which is DecStepL at a fixed c.
 \* It is necessitated in a clean context that is free of Spec, because an
 \* ambient Spec defeats an inline necessitation of DecStepL. The latch of the
 \* decision of each correct validator uses it, in the CertPropagatesAll lift.
 LEMMA DecStepBoxC ==
   ASSUME NEW c \in Honest
-  PROVE  [](IntegrityStep => (HasDecided(c) => HasDecided(c)'))
-<1>1. IntegrityStep => (HasDecided(c) => HasDecided(c)')
+  PROVE  [](TypeOK /\ [Next]_vars => (HasDecided(c) => HasDecided(c)'))
+<1>1. TypeOK /\ [Next]_vars => (HasDecided(c) => HasDecided(c)')
   BY DecStepL
 <1> QED
   BY <1>1, PTL
@@ -476,9 +476,9 @@ THEOREM CertPropagatesAll ==
           BY <5>6, <5>7, PTL
       \* the decision latches
       <4>lat. (decision[c] # nil) ~> [](decision[c] # nil)
-        <5>1. []IntegrityStep
-          BY IntegrityInv
-        <5>2a. [](IntegrityStep => (HasDecided(c) => HasDecided(c)'))
+        <5>1. [](TypeOK /\ [Next]_vars)
+          BY InvProof, PTL DEF Spec, Inv
+        <5>2a. [](TypeOK /\ [Next]_vars => (HasDecided(c) => HasDecided(c)'))
           BY DecStepBoxC
         <5>2. [](HasDecided(c) => HasDecided(c)')
           BY <5>1, <5>2a, PTL

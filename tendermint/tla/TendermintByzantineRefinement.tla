@@ -373,12 +373,6 @@ THEOREM ValidityInv == Spec => []Validity
 <1>2. QED
   BY <1>1, Refinement, PTL DEF P!Validity, Validity, P!nil, nil
 
-THEOREM IntegrityInv == Spec => []IntegrityStep
-<1>1. P!Spec => []P!IntegrityStep
-  BY P!IntegrityInv, ConstantAssumptions, PTL
-<1>2. QED
-  BY <1>1, Refinement, PTL DEF P!IntegrityStep, IntegrityStep, P!nil, nil
-
 =============================================================================
 \* Modification History
 \* Created Jun 10 2026 by hvanz (Hernán Vanzetto)

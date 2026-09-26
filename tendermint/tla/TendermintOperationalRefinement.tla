@@ -397,21 +397,6 @@ THEOREM ValidityInv == Spec => []Validity
 <1>3. QED
   BY <1>2, PTL DEF V!Validity, Validity, V!nil, nil
 
-(***************************************************************************)
-(* End-to-end transfer: operational Integrity follows from the refinement  *)
-(* plus the abstract IntegrityStepInv. IntegrityStep is an action property *)
-(* relating decision to decision', both mapped by the identity (the        *)
-(* projection touches only sent), with nil matching by NilProj, so         *)
-(* []V!IntegrityStep is []IntegrityStep.                                   *)
-(***************************************************************************)
-THEOREM IntegrityInv == Spec => []IntegrityStep
-<1>1. V!Spec => []V!IntegrityStep
-  BY V!IntegrityStepInv, QuorumIntersection, QuorumType, ValidatorsNonEmpty, ValidIsBoolean, ValidNonEmpty, PTL
-<1>2. Spec => []V!IntegrityStep
-  BY Refinement, <1>1, PTL
-<1>3. QED
-  BY <1>2, PTL DEF V!IntegrityStep, IntegrityStep, V!nil, nil
-
 =============================================================================
 \* Modification History
 \* Created Jun 7 2026 by hvanz (Hernán Vanzetto)

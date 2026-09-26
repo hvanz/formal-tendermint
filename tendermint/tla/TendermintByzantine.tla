@@ -430,11 +430,6 @@ Validity ==
   \A p \in Honest :
     decision[p] # nil => Valid(decision[p])
 
-\* Integrity: an honest validator's decision, once set, never changes value.
-IntegrityStep ==
-  \A p \in Honest :
-    decision[p] # nil => decision'[p] = decision[p]
-
 =============================================================================
 \* Modification History
 \* Created Jun 10 2026 by hvanz (Hernán Vanzetto)

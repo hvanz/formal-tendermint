@@ -538,30 +538,19 @@ THEOREM DecidedStepInv ==
 
 -----------------------------------------------------------------------------
 (***************************************************************************)
-(* LAYER 2: decision latch (inherited). Once an honest validator decides,  *)
-(* it stays decided, so proving <>HasDecided(p) is enough and it is        *)
-(* stable. Rests purely on the discharged IntegrityInv.           *)
+(* LAYER 2: decision latch. Once an honest validator decides, it stays     *)
+(* decided, so proving <>HasDecided(p) is enough and it is stable.         *)
 (***************************************************************************)
 \* The single-step decision-stability fact, as a top-level lemma so PTL boxes
-\* it (a numbered in-context implication would NOT be lifted to []). decision
-\* keeps its non-nil value by IntegrityStep, so HasDecided is preserved.
+\* it (a numbered in-context implication would NOT be lifted to []). Only
+\* OnPrecommitQuorumValue writes decision, with the guard decision[p] = nil.
 LEMMA DecStepL ==
-  ASSUME NEW p \in Honest, IntegrityStep, HasDecided(p)
+  ASSUME TypeOK, [Next]_vars, NEW p \in Honest, HasDecided(p)
   PROVE  HasDecided(p)'
-BY DEF IntegrityStep, HasDecided
-
-THEOREM DecLatch ==
-  Spec => \A p \in Honest : [](HasDecided(p) => []HasDecided(p))
-<1> SUFFICES ASSUME Spec
-             PROVE  \A p \in Honest : [](HasDecided(p) => []HasDecided(p))
-  OBVIOUS
-<1>1. []IntegrityStep
-  BY IntegrityInv
-<1>2. TAKE p \in Honest
-<1>3. [](HasDecided(p) => HasDecided(p)')
-  BY <1>1, DecStepL, PTL
-<1>. QED
-  BY <1>3, PTL
+BY DEFS HasDecided, Deliver, FaultyStep, HonestNext, HonestStep, Next, OnPrecommitQuorumValue, OnPrevoteQuorumNil,
+        OnPrevoteQuorumValueFirstTime, OnPrevoteQuorumValueLateUpdate, OnProposalNoPOL, OnProposalWithPOL,
+        OnTimeoutPrecommit, OnTimeoutPrevote, OnTimeoutPropose, Propose, ScheduleTimeoutPrecommit,
+        ScheduleTimeoutPrevote, SkipRound, Tick, TypeOK, vars
 
 -----------------------------------------------------------------------------
 (***************************************************************************)

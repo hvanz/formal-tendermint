@@ -692,10 +692,6 @@ Validity ==
   \A p \in Honest :
     decision[p] # nil => Valid(decision[p])
 
-IntegrityStep ==
-  \A p \in Honest :
-    decision[p] # nil => decision'[p] = decision[p]
-
 (***************************************************************************)
 (* Liveness property.                                                      *)
 (*                                                                         *)

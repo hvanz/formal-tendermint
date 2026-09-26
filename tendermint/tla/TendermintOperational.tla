@@ -395,14 +395,6 @@ Validity ==
   \A p \in Validators :
     decision[p] # nil => Valid(decision[p])
 
-\* Integrity: decision, once set, never changes value.
-\* (Action-level property; stated here as a binary relation on consecutive
-\* states. TendermintOperationalRefinement.tla wraps it in [][..]_vars to claim
-\* it of Spec.)
-IntegrityStep ==
-  \A p \in Validators :
-    decision[p] # nil => decision'[p] = decision[p]
-
 =============================================================================
 \* Modification History
 \* Created Jun 7 2026 by hvanz (Hernán Vanzetto)

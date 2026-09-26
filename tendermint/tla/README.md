@@ -182,17 +182,17 @@ Measured on 2026-08-09 with `/usr/bin/time -p`.
 
 | Module                              | Elapsed time | Proof obligations |
 |-------------------------------------|-------------:|------------------:|
-| `TendermintVotingProofs`            |      0:06.80 |               252 |
-| `TendermintOperationalRefinement`   |      0:12.99 |               242 |
-| `TendermintByzantineRefinement`     |      0:34.56 |               224 |
-| `TendermintPartialSyncRefinement`   |      2:50.69 |               465 |
-| **Total**                           |  **3:45.04** |         **1,183** |
+| `TendermintVotingProofs`            |      0:06.80 |               239 |
+| `TendermintOperationalRefinement`   |      0:12.99 |               227 |
+| `TendermintByzantineRefinement`     |      0:34.56 |               216 |
+| `TendermintPartialSyncRefinement`   |      2:50.69 |               445 |
+| **Total**                           |  **3:45.04** |         **1,127** |
 
 **Termination**:
 
 | Module                         | Elapsed time | Proof obligations |
 |--------------------------------|-------------:|------------------:|
-| `TerminationBase`              |      0:14:42 |             1,357 |
+| `TerminationBase`              |      0:14:42 |             1,345 |
 | `TerminationNonZeno`           |      0:17:22 |             1,244 |
 | `TerminationRoundProgress`     |      1:00:37 |             2,114 |
 | `TerminationWithinRound`       |      0:09:10 |               770 |

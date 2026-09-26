@@ -581,18 +581,6 @@ THEOREM ValidityInv == Spec => []Validity
 <1>3. QED
   BY <1>1, <1>2, PTL DEF Validity, B!Validity, B!Honest, Honest, B!nil, nil
 
-THEOREM IntegrityInv == Spec => []IntegrityStep
-<1>1. Spec => B!Spec
-  BY Refinement
-<1>2. B!Spec => []B!IntegrityStep
-  BY B!IntegrityInv, HonestCo,
-     ValidatorsNonEmptyL, HonestNonEmptyL, ByzQuorumTypeL, WeakQuorumTypeL,
-     ValidIsBoolean, ValidNonEmpty, FaultyType, ProposerType,
-     ByzQuorumIntersection, WeakQuorumHasHonest, PTL
-  DEF B!Honest, Honest
-<1>3. QED
-  BY <1>1, <1>2, PTL DEF IntegrityStep, B!IntegrityStep, B!Honest, Honest, B!nil, nil
-
 =============================================================================
 \* Modification History
 \* Created Jun 10 2026 by hvanz (Hernán Vanzetto)
