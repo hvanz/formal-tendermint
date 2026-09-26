@@ -97,12 +97,12 @@ P == INSTANCE TendermintOperationalRefinement
 VoteStepProgress ==
   /\ \A m \in SentPrevotes : m.sender \in Honest =>
         \/ m.round < round[m.sender]
-        \/ /\ (m.round = round[m.sender] 
-           /\ step[m.sender] \in {"prevote", "precommit", "decided"})
+        \/ /\ m.round = round[m.sender]
+           /\ step[m.sender] \in {"prevote", "precommit", "decided"}
   /\ \A m \in SentPrecommits : m.sender \in Honest =>
         \/ m.round < round[m.sender]
-        \/ /\ (m.round = round[m.sender] 
-           /\ step[m.sender] \in {"precommit", "decided"})
+        \/ /\ m.round = round[m.sender]
+           /\ step[m.sender] \in {"precommit", "decided"}
 
 \* Every honest validator is a validator (so round/step/etc. are well-typed).
 LEMMA HonestIsValidator == Honest \subseteq Validators
