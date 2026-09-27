@@ -32,22 +32,15 @@ EXTENDS TendermintPartialSyncTerminationCascadeInvariants
 (*  work. That step is the Tick which lifts the clock off the ceiling. The *)
 (*  maximal-progress guard of Tick forces the proposal to be there         *)
 (*  already. Absence of a round-r proposal makes ProposeEnabledFromAbsence *)
-(*  fire, and an exit above r makes the backing chain fire and hit the     *)
-(*  propose-timeout margin. Each outcome contradicts the guard.            *)
+(*  fire, and an exit above r makes the backing chain fire. A correct      *)
+(*  prevote on propose timeout is then above the ceiling, because          *)
+(*  TimeoutPropose(r) > 2 * Delta. Each outcome contradicts the guard.     *)
+(*                                                                         *)
+(*  The ceiling is one Delta above the entry. The late entry of            *)
+(*  RoundOrigin dates the certificate of round r - 1 at or after GST, so   *)
+(*  every correct validator reaches r within Delta of the entry.           *)
 (***************************************************************************)
-CascadeCeiling(p, r) == enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1)
-
-\* The margin, read at a round. TimeoutPropose(rr) clears the ceiling offset
-\* Delta + TimeoutPrecommit(rr - 1) by a whole Delta.
-LEMMA ProposeClearsCeiling ==
-  ASSUME NEW rr \in Nat, rr > 0
-  PROVE  TimeoutPropose(rr) > Delta + TimeoutPrecommit(rr - 1)
-<1>1. rr * TDelta = (rr - 1) * TDelta + TDelta
-  BY TDeltaType, SMT
-<1> QED
-  BY <1>1, DeltaType, ProposeTimeoutMargin, T0PrecommitType, T0ProposeType,
-     TDeltaType, SMT
-  DEFS TimeoutPrecommit, TimeoutPropose
+CascadeCeiling(p, r) == enteredAt[p][r] + Delta
 
 \* The precommit timeout of any round is a positive natural. NO SMT here:
 \* T0Precommit + rr * TDelta is NONLINEAR, and the default backends close it
@@ -121,18 +114,28 @@ LEMMA RoundTypes ==
 \* Arithmetic in a minimal context. An entry at or after t0 whose propose
 \* deadline clears the ceiling cannot have a prevote at or below the ceiling.
 LEMMA CeilingBelowProposeDeadline ==
-  ASSUME NEW t0 \in Int, NEW tc \in Int, NEW tp \in Int, NEW d \in Int,
+  ASSUME NEW t0 \in Int, NEW tp \in Int, NEW d \in Nat,
          NEW x \in Int, NEW y \in Int,
-         tp > d + tc, y >= t0, x >= y + tp, x <= t0 + d + tc
+         tp > 2 * d, y >= t0, x >= y + tp, x <= t0 + d
   PROVE  FALSE
 BY SMT
 
 \* A clock that has just recorded an entry cannot already be past that entry's
 \* ceiling, not even after one tick.
 LEMMA ClockBelowFreshEntry ==
-  ASSUME NEW n \in Nat, NEW np \in Int, NEW d \in Int, NEW k \in Int,
-         d > 1, k > 0, np = n \/ np = n + 1, np > n + d + k
+  ASSUME NEW n \in Nat, NEW np \in Int, NEW d \in Int,
+         d > 1, np = n \/ np = n + 1, np > n + d
   PROVE  FALSE
+BY SMT
+
+\* The certificate date of a late entry is at or after GST, and the ceiling
+\* is one Delta and one precommit timeout above that date.
+LEMMA SpreadArith ==
+  ASSUME NEW e \in Nat, NEW k \in Nat, NEW g \in Nat, NEW d \in Nat,
+         NEW n \in Nat, e >= g + k, n >= e + d
+  PROVE  /\ e - k \in Nat
+         /\ e - k >= g
+         /\ n >= (e - k) + d + k
 BY SMT
 
 \* Only Tick moves the clock. This is the sibling of TickFromClockAdvance in
@@ -163,59 +166,57 @@ LEMMA DecidedLatchStep ==
 <1> QED
   BY <1>1, <1>2 DEFS HasDecided, SomeCorrectDecided
 
-\* The certificate of the previous round, read off CrossingBacked and weakened
-\* to the entry instant. Top-level, because DatedCertWeaken's unification runs
-\* under TWO quantifiers and cannot be done with the eleven invariants of
-\* ProposalAtCeiling in scope.
+\* The certificate of the previous round, read off CrossingBacked. After a
+\* late entry, its date is at or after GST.
 LEMMA EntryCertificateDated ==
   ASSUME TypeOK, CrossingBacked, NEW p \in Honest, NEW r \in Rounds, r > 0,
          enteredAt[p][r] # OFF
-  PROVE  AnyPrecommitDated(r - 1, enteredAt[p][r])
+  PROVE  AnyPrecommitDated(r - 1, enteredAt[p][r] - TimeoutPrecommit(r - 1))
 <1>ty. /\ r \in Nat /\ r - 1 \in Rounds /\ r - 1 < r
-       /\ TimeoutPrecommit(r - 1) \in Nat /\ TimeoutPrecommit(r - 1) >= 0
+       /\ TimeoutPrecommit(r - 1) \in Nat
   BY RoundTypes
-<1>e. enteredAt[p][r] \in Nat
-  BY DEFS OFF, TypeOK
 <1>1. \E Q \in ByzQuorum : \A s \in Q : \E v \in ValuesOrNil :
         /\ Precommit(s, r - 1, v) \in sent
         /\ sentTime[Precommit(s, r - 1, v)]
              <= enteredAt[p][r] - TimeoutPrecommit(r - 1)
   BY <1>ty DEF CrossingBacked
-<1>2. /\ enteredAt[p][r] - TimeoutPrecommit(r - 1) \in Int
-      /\ enteredAt[p][r] - TimeoutPrecommit(r - 1) <= enteredAt[p][r]
-  BY <1>e, <1>ty, MinusNatBelow
-<1>3. \E Q \in ByzQuorum : \A s \in Q : \E v \in ValuesOrNil :
-        /\ Precommit(s, r - 1, v) \in sent
-        /\ sentTime[Precommit(s, r - 1, v)] <= enteredAt[p][r]
-  BY <1>1, <1>2, <1>e, DatedCertWeaken
 <1> QED
-  BY <1>3 DEF AnyPrecommitDated
+  BY <1>1 DEF AnyPrecommitDated
 
 \* Every undecided correct validator is at or above r once the clock sits on
-\* the ceiling. Top-level for the same reason as above.
+\* the ceiling. EntryReachedAtCeiling is applied at the certificate date,
+\* which the late entry puts at or after GST. Top-level, because the eleven
+\* invariants of ProposalAtCeiling are not in scope here.
 LEMMA AllAboveEntryRound ==
   ASSUME TypeOK, EntryWindowCore, NEW p \in Honest, NEW r \in Rounds, r > 0,
-         enteredAt[p][r] # OFF, enteredAt[p][r] >= GST,
-         AnyPrecommitDated(r - 1, enteredAt[p][r]),
-         now = enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1),
+         enteredAt[p][r] # OFF,
+         enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1),
+         AnyPrecommitDated(r - 1, enteredAt[p][r] - TimeoutPrecommit(r - 1)),
+         now = enteredAt[p][r] + Delta,
          ~ \E q \in Honest : CanCompute(q),
          \A cc \in Honest : step[cc] # "decided",
          NEW c \in Honest
   PROVE  round[c] >= r
 <1>ty. /\ r \in Nat /\ r - 1 \in Rounds /\ TimeoutPrecommit(r - 1) \in Nat
   BY RoundTypes
-<1>e. enteredAt[p][r] \in Nat
-  BY DEFS OFF, TypeOK
-<1>i. enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1) \in Int
-  BY <1>e, <1>ty, DeltaType
-<1>ge. now >= enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1)
-  BY <1>i, GeFromEq DEF TypeOK
-<1>1. round[c] > r - 1
-  BY <1>e, <1>ge, <1>ty, EntryReachedAtCeiling
+<1>e. /\ enteredAt[p][r] \in Nat /\ now \in Nat
+      /\ GST \in Nat /\ Delta \in Nat
+  BY DeltaType, GSTType DEFS OFF, TypeOK
+<1>i. enteredAt[p][r] + Delta \in Int
+  BY <1>e
+<1>ge. now >= enteredAt[p][r] + Delta
+  BY <1>e, <1>i, GeFromEq
+<1> DEFINE T == enteredAt[p][r] - TimeoutPrecommit(r - 1)
+<1>1. /\ T \in Nat
+      /\ T >= GST
+      /\ now >= T + Delta + TimeoutPrecommit(r - 1)
+  BY <1>e, <1>ge, <1>ty, SpreadArith
+<1>2. round[c] > r - 1
+  BY <1>1, <1>ty, EntryReachedAtCeiling
 <1>t2. round[c] \in Nat /\ r \in Nat
   BY <1>ty DEFS Rounds, TypeOK
 <1> QED
-  BY <1>1, <1>t2, GeFromAbovePred
+  BY <1>2, <1>t2, GeFromAbovePred
 
 \*  The state content of the ceiling. Take a state where the clock sits ON the
 \*  ceiling, and where no correct validator has a computation step. The
@@ -227,6 +228,7 @@ LEMMA ProposalAtCeiling ==
          PrevoteNeedsProposalOrTimeout, DecidedStepOp,
          NEW p \in Honest, NEW r \in Rounds, NEW q \in Honest,
          RoundOrigin(p, r), Proposer[r] = q,
+         TimeoutPropose(r) > 2 * Delta,
          now = CascadeCeiling(p, r),
          ~ \E x \in Honest : CanCompute(x),
          ~ SomeCorrectDecided
@@ -235,9 +237,11 @@ LEMMA ProposalAtCeiling ==
            /\ sentTime[Proposal(q, r, v, vr)] <= CascadeCeiling(p, r)
 <1>lr. /\ r \in Nat /\ r > 0 /\ r - 1 \in Rounds /\ r - 1 < r
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] >= GST
+       /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
        /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta >= 0
        /\ TimeoutPrecommit(r - 1) \in Int
-  <2>1. r > 0 /\ enteredAt[p][r] # OFF /\ enteredAt[p][r] > GST
+  <2>1. /\ r > 0 /\ enteredAt[p][r] # OFF /\ enteredAt[p][r] > GST
+        /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
     BY DEF RoundOrigin
   <2>2. /\ r \in Nat /\ r - 1 \in Rounds /\ r - 1 < r
         /\ TimeoutPrecommit(r - 1) \in Nat
@@ -248,12 +252,12 @@ LEMMA ProposalAtCeiling ==
     BY <2>1, <2>2, <2>3, DeltaType, GSTType
 <1>off. enteredAt[p][r] # OFF
   BY DEF RoundOrigin
-<1>ap. AnyPrecommitDated(r - 1, enteredAt[p][r])
+<1>ap. AnyPrecommitDated(r - 1, enteredAt[p][r] - TimeoutPrecommit(r - 1))
   BY <1>lr, <1>off, EntryCertificateDated
 <1>nd. \A c \in Honest : step[c] # "decided"
   BY DEFS DecidedStepOp, HasDecided, SomeCorrectDecided
 \* Nobody correct is below r any more.
-<1>ceil. now = enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1)
+<1>ceil. now = enteredAt[p][r] + Delta
   BY DEF CascadeCeiling
 <1>up. \A c \in Honest : round[c] >= r
   <2> SUFFICES ASSUME NEW c \in Honest PROVE round[c] >= r
@@ -273,7 +277,8 @@ LEMMA ProposalAtCeiling ==
   <2> QED
     BY <1>rb, <2>1
 \* The last arrow, packaged. A correct prevote at r gives the proposal, or a
-\* propose deadline that the margin puts above the ceiling.
+\* propose deadline that TimeoutPropose(r) > 2 * Delta puts above the
+\* ceiling.
 <1>pv. ASSUME NEW c \in Honest, NEW w \in ValuesOrNil,
               Prevote(c, r, w) \in sent
        PROVE  \E v \in Values, vr \in Rounds \cup {-1} :
@@ -318,10 +323,9 @@ LEMMA ProposalAtCeiling ==
                >= enteredAt[c][r] + TimeoutPropose(r)
     <3>1. enteredAt[c][r] >= enteredAt[p][r]
       BY <2>1 DEFS EntriesAtOrAfter, RoundOrigin
-    <3>2. TimeoutPropose(r) > Delta + TimeoutPrecommit(r - 1)
-      BY <1>lr, ProposeClearsCeiling
-    <3>3. sentTime[Prevote(c, r, w)]
-            <= enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1)
+    <3>2. TimeoutPropose(r) > 2 * Delta
+      OBVIOUS
+    <3>3. sentTime[Prevote(c, r, w)] <= enteredAt[p][r] + Delta
       BY <2>d DEF CascadeCeiling
     <3>4. FALSE
       BY <1>lr, <2>b, <2>ty, <3>1, <3>2, <3>3, CeilingBelowProposeDeadline
@@ -395,6 +399,7 @@ ProposalDated ==
   \A p \in Honest, r \in Rounds :
     ( /\ RoundOrigin(p, r)
       /\ Proposer[r] \in Honest
+      /\ TimeoutPropose(r) > 2 * Delta
       /\ now > CascadeCeiling(p, r) )
     => \/ SomeCorrectDecided
        \/ \E v \in Values, vr \in Rounds \cup {-1} :
@@ -418,6 +423,7 @@ LEMMA ProposalDatedStepL ==
   BY SentMonotoneStep
 <1> SUFFICES ASSUME NEW p \in Honest, NEW r \in Rounds,
                     RoundOrigin(p, r)', Proposer[r] \in Honest,
+                    TimeoutPropose(r) > 2 * Delta,
                     now' > CascadeCeiling(p, r)'
              PROVE  \/ SomeCorrectDecided'
                     \/ \E v \in Values, vr \in Rounds \cup {-1} :
@@ -818,10 +824,10 @@ CascadeEntry(p, r, b) == CascadeDurable(p, r) /\ CascadeCeiling(p, r) <= b
 \* Two minimal-context arithmetic facts. The deadline is the ceiling plus one
 \* gossip delay, which is what JustifiedWeaken has to cover.
 LEMMA CeilingBelowDeadline ==
-  ASSUME NEW e \in Nat, NEW d \in Nat, NEW k \in Nat
-  PROVE  /\ e + d + k \in Nat
-         /\ e + 2 * d + k \in Nat
-         /\ e + d + k <= e + 2 * d + k
+  ASSUME NEW e \in Nat, NEW d \in Nat
+  PROVE  /\ e + d \in Nat
+         /\ e + 2 * d \in Nat
+         /\ e + d <= e + 2 * d
 BY SMT
 
 LEMMA GtFromPinned ==
@@ -920,6 +926,7 @@ LEMMA BoxProposalFromCeiling ==
   <2>d. /\ CascadeDurable(p, r)
         /\ RoundOrigin(p, r)
         /\ Proposer[r] \in Honest
+        /\ TimeoutPropose(r) > 2 * Delta
         /\ CascadeCeiling(p, r) <= b
     BY DEFS CascadeDurable, CascadeEntry, WRDurable
   <2>ty. /\ enteredAt[p][r] \in Nat /\ Delta \in Nat
@@ -1505,13 +1512,13 @@ LEMMA PrevoteStepKeepsProposals ==
 <1> QED
   BY <1>4 DEF sent
 
-\* Arithmetic in a minimal context. An entry at or after the origin, whose
-\* propose deadline clears the window offset by a whole Delta, lands above the
-\* window.
-LEMMA GtFromEntryMargin ==
+\* Arithmetic in a minimal context. An entry e at or after the origin e0,
+\* with a propose timeout above 2 * Delta, gives a propose deadline above
+\* e0 + 2 * Delta.
+LEMMA GtFromEntryTimeout ==
   ASSUME NEW e \in Int, NEW e0 \in Int, NEW tp \in Int, NEW d \in Int,
-         NEW k \in Int, e >= e0, tp > 2 * d + k
-  PROVE  e + tp > e0 + 2 * d + k
+         e >= e0, tp > 2 * d
+  PROVE  e + tp > e0 + 2 * d
 BY SMT
 
 NilPrevoteBlocks(p, r) ==
@@ -1629,14 +1636,14 @@ LEMMA FreshNilPrevoteBlocks ==
   <2> QED
     BY <2>1, <2>2, <2>3, DeltaType DEFS OFF, TypeOK
 \*  The propose deadline of c is above the window. c entered r at or after p,
-\*  and the margin of WRDurable clears the window by a whole Delta.
+\*  and TimeoutPropose(r) > 2 * Delta of WRDurable clears the window.
 <1>late. enteredAt[c][r] + TimeoutPropose(r) > CascadeDeadline(p, r)
   <2>1. enteredAt[c][r] >= enteredAt[p][r]
     BY <1>ty DEFS EntriesAtOrAfter, OFF, RoundOrigin
-  <2>2. TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+  <2>2. TimeoutPropose(r) > 2 * Delta
     BY DEF WRDurable
   <2> QED
-    BY <1>ty, <2>1, <2>2, GtFromEntryMargin DEF CascadeDeadline
+    BY <1>ty, <2>1, <2>2, GtFromEntryTimeout DEF CascadeDeadline
 \* Both proposal actions read the SAME round-r proposal, by uniqueness, and
 \* their nil branch is the negated accept guard.
 <1>ref. ASSUME NEW prop \in RProposalsFromProposerAt(c, round[c]),
@@ -1828,10 +1835,10 @@ LEMMA NilPrevoteBlocksStepL ==
       BY <1>2, <3>1 DEFS PrevoteNeedsProposalOrTimeout, ValuesOrNil
     <3>3. enteredAt[c][r] >= enteredAt[p][r] /\ enteredAt[c][r] \in Nat
       BY <1>ty, <3>2 DEFS EntriesAtOrAfter, OFF, RoundOrigin, TypeOK
-    <3>4. TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+    <3>4. TimeoutPropose(r) > 2 * Delta
       BY DEF WRDurable
     <3>5. enteredAt[c][r] + TimeoutPropose(r) > CascadeDeadline(p, r)
-      BY <1>ty, <3>3, <3>4, GtFromEntryMargin DEF CascadeDeadline
+      BY <1>ty, <3>3, <3>4, GtFromEntryTimeout DEF CascadeDeadline
     <3>t. sentTime[Prevote(c, r, nil)] \in Int
       BY <1>2, <1>mv DEFS OFF, sent, TypeOK
     <3> QED
@@ -2362,4 +2369,5 @@ THEOREM NilPrevoteBlocksLatch ==
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

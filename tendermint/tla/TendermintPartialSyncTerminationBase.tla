@@ -51,12 +51,13 @@ FirstToEnter(p, r) ==
   /\ \A c \in Honest : round[c] <= r
   /\ \A c \in Honest : enteredAt[c][r] = OFF \/ enteredAt[c][r] >= now
 
-\* The four numbered hypotheses of Lemma 5, from Section IV of the paper, word
-\* for word. Lemma 5 of the paper has EXACTLY these four. Termination, which
-\* is paper Lemma 7, uses only "all correct processes decide".
+\* The four numbered hypotheses of Lemma 5, from Section IV of the paper.
+\* Clause (1) has one conjunct more than the paper, the late entry (see
+\* below). Termination, which is paper Lemma 7, uses only "all correct
+\* processes decide".
 \*
-\*   Two other clauses do NOT belong here. They are a clause decidedRound[c] =
-\*   OFF, and a stable cardinality clause about the absence of an earlier
+\*   Two other clauses do NOT belong here. They are a clause decidedRound[c]
+\*   = OFF, and a stable cardinality clause about the absence of an earlier
 \*   certificate. Neither one is reachable from the branch hypothesis
 \*   ~AllDecide of Termination. Under ~AllDecide a value can have between f+1
 \*   and 2f correct precommitters and no decision, because the faulty
@@ -68,21 +69,26 @@ FirstToEnter(p, r) ==
 \*  through the TerminationThm composition, and it is discharged there from
 \*  ~AllDecide.
 \*
-\* The propose clause and the prevote clause both carry the entry spread of
-\* the round, which is Delta + TimeoutPrecommit(r - 1), and not Delta.
-\* PrevoteTimeoutMargin in TendermintPartialSync derives the prevote clause. A
-\* counterexample run refutes the weaker form of the paper. The precommit
-\* clause needs no margin.
-\* A precommit timeout only raises the round, and OnPrecommitQuorumValue holds
-\* no guard on the round. A process that has left r therefore still decides on
-\* a quorum of round r.
+\* The late entry. The entry is at or after GST + TimeoutPrecommit(r - 1).
+\* Then the round-(r - 1) certificate of the entry is sent at or after GST,
+\* and the entry spread of round r is Delta. Clause (4) then needs only
+\* TimeoutX(r) > 2 * Delta. With t > GST alone, the entry spread is
+\* Delta + TimeoutPrecommit(r - 1), and a round with the short clause (4) can
+\* fail. TendermintPartialSyncTerminationEntrySpreadMC shows such a round.
+\* Lemma 7 proves the late entry at every round r > GST, so it is not an
+\* assumption on the environment.
+\* The precommit clause never needed the entry spread. A precommit timeout
+\* only raises the round, and OnPrecommitQuorumValue holds no guard on the
+\* round. A process that has left r therefore still decides on a quorum of
+\* round r.
 Lemma5Timeouts(r) ==
-  /\ TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
-  /\ TimeoutPrevote(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ TimeoutPropose(r)   > 2 * Delta
+  /\ TimeoutPrevote(r)   > 2 * Delta
   /\ TimeoutPrecommit(r) > 2 * Delta
 
 Lemma5Hyp(p, r) ==
   /\ now > GST                                                      \* (1) t > GST
+  /\ now >= GST + TimeoutPrecommit(r - 1)                           \* (1) late entry
   /\ r > 0                                                          \* (1) r > 0
   /\ FirstToEnter(p, r)                                             \* (1) p first correct into r at t
   /\ Proposer[r] \in Honest                                         \* (2) proposer q of round r is correct
@@ -100,8 +106,8 @@ GoodRoundExists ==
 WRDurable(r) ==
   /\ now >= GST
   /\ Proposer[r] \in Honest
-  /\ TimeoutPropose(r)   > 2 * Delta + TimeoutPrecommit(r - 1)
-  /\ TimeoutPrevote(r)   > 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ TimeoutPropose(r)   > 2 * Delta
+  /\ TimeoutPrevote(r)   > 2 * Delta
   /\ TimeoutPrecommit(r) > 2 * Delta
 
 -----------------------------------------------------------------------------
@@ -2312,4 +2318,5 @@ THEOREM ReachExistsLT ==
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

@@ -15,25 +15,26 @@
 (*   ByzQuorum = size->=3 sets (2f+1), WeakQuorum = size->=2 sets (f+1),   *)
 (*     both DEFINED in TendermintPartialSync from f and Cardinality.       *)
 (*                                                                         *)
-(* TIMING PARAMETERS (GST = 0, Delta = 1, T0Propose = 7,                   *)
+(* TIMING PARAMETERS (GST = 0, Delta = 2, T0Propose = 7,                   *)
 (* T0Prevote = T0Precommit = 5, TDelta = 1):                               *)
 (*   GST = 0 means SYNCHRONOUS FROM THE START: every message sent at time  *)
-(*   t has deadline t + 1, so it is delivered before the propose timeout   *)
-(*   fires at now = 5. With every base timeout 5 >> Delta = 1, every       *)
-(*   round-0 message arrives and is processed (maximal progress) before    *)
-(*   any timeout fires, so every honest validator decides in round 0.      *)
-(*   Exhaustively checked (Termination + TypeOK + Agreement; no            *)
-(*   violation). For a GST > 0 recovery scenario (round 0 fails pre-GST,   *)
-(*   round 1 decides post-GST), set GST = 1, the three base timeouts to 1, *)
-(*   TDelta = 3 and widen MCNat                                            *)
-(*   to 0..14; the state space is too large to exhaust in-session but no   *)
-(*   violation has been found.                                             *)
+(*   t has deadline t + 2. A Tick needs now + 1 < t + 2, so the message    *)
+(*   arrives by now = t + 1. The round-0 proposal arrives by now = 1, the  *)
+(*   prevotes by now = 2 and the precommits by now = 3. The propose        *)
+(*   timeout fires at now = 7. So every honest validator decides in the    *)
+(*   first round. TLC stopped on a full disk after 3 h 55 min with 4       *)
+(*   workers. It found no violation in 369,406 distinct states. The check  *)
+(*   is not exhaustive: 209,519 states were still in the queue.            *)
+(*   This model does not check a GST > 0 recovery case, where the first    *)
+(*   round fails before GST and a later round decides after GST. The       *)
+(*   recovery constants of earlier versions used Delta = 1, which          *)
+(*   DeltaType does not permit.                                            *)
 (*                                                                         *)
 (* BOUNDS / SOUNDNESS:                                                     *)
 (*   Nat <- MCNat bounds every 'r \in Rounds' quantifier AND the clock     *)
 (*   `now`. The clock stays small because Tick is gated by TickUseful      *)
 (*   (no pointless ticking) and maximal progress; rounds stay at 0 here    *)
-(*   (no timeout fires). MCNat = 0..8 is ample headroom.                   *)
+(*   (no timeout fires). MCNat = 0..7 contains the clock values 0..3.      *)
 (*   NO state constraint and NO symmetry (both unsound for liveness).      *)
 (*   No faulty activity: faulty messages can only help quorums form, so    *)
 (*   omitting them is the worst case for liveness. Byzantine SAFETY is     *)
@@ -70,10 +71,9 @@ MCProposalMsg == [
 \* Bounds Rounds quantifiers, the clock `now` AND validRound's range (via
 \* MCProposalMsg). Nat <- MCNat also constrains the timing constants, so
 \* MCNat must contain the base timeouts 7, 5, and 5 (else an ASSUME T0XType
-\* is false). In the GST=0 synchronous case maximal progress runs the whole
-\* round-0 cascade at now=0 (computation is instantaneous relative to the
-\* clock) and every honest validator decides before any timeout, so the clock
-\* stays in {0,1} and rounds stay 0; 0..7 covers the base timeouts and keeps
+\* is false). In the GST=0 synchronous case every honest validator decides
+\* in round 0 by now = 3, before any timeout (see the header). So the clock
+\* stays in 0..3 and rounds stay 0. 0..7 covers the base timeouts and keeps
 \* Message small.
 MCNat == 0..7
 
@@ -111,4 +111,5 @@ MCLiveSpec == Init /\ [][MCNext]_vars /\ Fairness
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Jun 10 2026 by hvanz (Hernán Vanzetto)

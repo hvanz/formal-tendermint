@@ -166,6 +166,7 @@ RoundOrigin(p, r) ==
   /\ r > 0
   /\ enteredAt[p][r] # OFF
   /\ enteredAt[p][r] > GST
+  /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
   /\ EntriesAtOrAfter(r, enteredAt[p][r])
 
 LEMMA Lemma5HypImpliesRoundOrigin ==
@@ -188,8 +189,10 @@ LEMMA Lemma5HypImpliesRoundOrigin ==
   BY DEF Lemma5Hyp, FirstToEnter
 <1>8. EntriesAtOrAfter(r, enteredAt[p][r])
   BY <1>2, <1>7 DEF EntriesAtOrAfter
+<1>9. enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
+  BY <1>2 DEF Lemma5Hyp
 <1> QED
-  BY <1>1, <1>4, <1>6, <1>8 DEF RoundOrigin
+  BY <1>1, <1>4, <1>6, <1>8, <1>9 DEF RoundOrigin
 
 \* Entry slots are write once. A newly populated slot records the current
 \* clock. RoundEntryHistory proves that a strictly higher round slot is fresh.
@@ -1031,4 +1034,5 @@ LEMMA AllDecidedLeadsToEach ==
   BY <1>1, PTL
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

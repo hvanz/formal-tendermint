@@ -490,7 +490,8 @@ LEMMA RoundOriginBack ==
   BY EntryUpdateDisciplineStep
 <1>1. enteredAt'[p][r] = enteredAt[p][r]
   BY <1>ud DEF EntryUpdateDiscipline
-<1>2. r > 0 /\ enteredAt[p][r] > GST
+<1>2. /\ r > 0 /\ enteredAt[p][r] > GST
+      /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
   BY <1>1 DEF RoundOrigin
 <1>3. ASSUME NEW c \in Honest, enteredAt[c][r] # OFF
       PROVE  enteredAt[c][r] >= enteredAt[p][r]
@@ -1448,4 +1449,5 @@ THEOREM Lemma5ResolutionExists ==
 BY Lemma5ResolutionFromAll, Lemma5ReachRule DEF Lemma5Reach
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

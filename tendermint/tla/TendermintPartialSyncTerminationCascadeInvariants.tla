@@ -717,7 +717,7 @@ THEOREM ProposalJustifiedInv == ASSUME Spec PROVE []ProposalJustified
 CascadeDurable(p, r) == RoundOrigin(p, r) /\ WRDurable(r)
 
 CascadeDeadline(p, r) ==
-  enteredAt[p][r] + 2 * Delta + TimeoutPrecommit(r - 1)
+  enteredAt[p][r] + 2 * Delta
 
 \* M1. Justified already carries the proposal, its date, its sender, its round,
 \* its value and its proof-of-lock polka, so no separate ProposalDated operator
@@ -797,12 +797,8 @@ LEMMA CascadeDeadlineType ==
          /\ enteredAt[p][r] <= CascadeDeadline(p, r)
 <1>1. enteredAt[p][r] \in Nat
   BY DEFS OFF, TypeOK
-<1>2. r - 1 \in Nat
-  BY DEF Rounds
-<1>3. TimeoutPrecommit(r - 1) \in Nat
-  BY <1>2, T0PrecommitType, TDeltaType DEF TimeoutPrecommit
 <1> QED
-  BY <1>1, <1>3, DeltaType DEF CascadeDeadline
+  BY <1>1, DeltaType DEF CascadeDeadline
 
 LEMMA Lemma5HypDurable ==
   ASSUME TypeOK, NEW p \in Honest, NEW r \in Rounds, Lemma5Hyp(p, r)
@@ -2142,4 +2138,5 @@ LEMMA EntryReachedAtCeiling ==
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

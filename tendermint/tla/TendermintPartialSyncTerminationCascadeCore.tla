@@ -4,8 +4,8 @@
 (* CascadeCore.                                                            *)
 (*                                                                         *)
 (* Owns ProposeExitByDeadline, RoundVoteAfterEntry, NilPrevoteInWindow,    *)
-(* CascadeAnchor, StepPrecommitHasPrecommit, PrecommitQuorumFor,           *)
-(* CascadeEscape and CascadeCore. The one temporal export is               *)
+(* StepPrecommitHasPrecommit, PrecommitQuorumFor, CascadeEscape and        *)
+(* CascadeCore. The one temporal export is                                 *)
 (* CascadeCoreLatch.                                                       *)
 (*                                                                         *)
 (* CascadeCore is defined in this link, beside its own induction. This     *)
@@ -47,18 +47,28 @@ DEFS OnPrecommitQuorumValue, OnPrevoteQuorumNil, OnPrevoteQuorumValueFirstTime, 
 \* The deadline is the ceiling plus one gossip delay. Each helper returns
 \* everything its call site needs, so the call site never searches.
 LEMMA DeadlineAboveCeiling ==
-  ASSUME NEW e \in Nat, NEW d \in Nat, NEW k \in Nat, NEW n \in Nat,
-         NEW g \in Nat, d > 1, e >= g, n >= e + 2 * d + k
-  PROVE  /\ e + d + k \in Nat
-         /\ e + d + k >= g
-         /\ n > e + d + k
-         /\ n >= (e + d + k) + d
+  ASSUME NEW e \in Nat, NEW d \in Nat, NEW n \in Nat,
+         NEW g \in Nat, d > 1, e >= g, n >= e + 2 * d
+  PROVE  /\ e + d \in Nat
+         /\ e + d >= g
+         /\ n > e + d
+         /\ n >= (e + d) + d
 BY SMT
 
 LEMMA ClockLeFreshDeadline ==
-  ASSUME NEW n \in Nat, NEW np \in Int, NEW d \in Nat, NEW k \in Nat,
+  ASSUME NEW n \in Nat, NEW np \in Int, NEW d \in Nat,
          d > 1, np = n \/ np = n + 1
-  PROVE  np <= n + 2 * d + k
+  PROVE  np <= n + 2 * d
+BY SMT
+
+\* The strict form of SpreadArith: a clock above the ceiling is above the
+\* certificate date plus one Delta and one precommit timeout.
+LEMMA SpreadArithStrict ==
+  ASSUME NEW e \in Nat, NEW k \in Nat, NEW g \in Nat, NEW d \in Nat,
+         NEW n \in Nat, e >= g + k, n > e + d
+  PROVE  /\ e - k \in Nat
+         /\ e - k >= g
+         /\ n > (e - k) + d + k
 BY SMT
 
 LEMMA SuccLeFromNe ==
@@ -75,7 +85,8 @@ BY SMT
 LEMMA ProposeExitAtDeadline ==
   ASSUME TypeOK, GossipDeadline, ProposalDated, ProposalJustified,
          NEW p \in Honest, NEW r \in Rounds, NEW c \in Honest,
-         RoundOrigin(p, r), Proposer[r] \in Honest, ~ SomeCorrectDecided,
+         RoundOrigin(p, r), Proposer[r] \in Honest,
+         TimeoutPropose(r) > 2 * Delta, ~ SomeCorrectDecided,
          now >= CascadeDeadline(p, r),
          round[c] = r, step[c] = "propose"
   PROVE  CanCompute(c)
@@ -87,6 +98,7 @@ ProposeExitByDeadline ==
   \A p \in Honest, r \in Rounds, c \in Honest :
     ( /\ RoundOrigin(p, r)
       /\ Proposer[r] \in Honest
+      /\ TimeoutPropose(r) > 2 * Delta
       /\ round[c] = r
       /\ step[c] = "propose" )
     => \/ SomeCorrectDecided
@@ -101,6 +113,7 @@ LEMMA ProposeExitByDeadlineStepL ==
   PROVE  ProposeExitByDeadline'
 <1> SUFFICES ASSUME NEW p \in Honest, NEW r \in Rounds, NEW c \in Honest,
                     RoundOrigin(p, r)', Proposer[r] \in Honest,
+                    TimeoutPropose(r) > 2 * Delta,
                     round'[c] = r, step'[c] = "propose",
                     ~ SomeCorrectDecided'
              PROVE  now' <= CascadeDeadline(p, r)'
@@ -133,7 +146,7 @@ LEMMA ProposeExitByDeadlineStepL ==
     DEFS EntryUpdateDiscipline, RoundOrigin
   <2>2. now' = now \/ now' = now + 1
     BY NowShape
-  <2>3. CascadeDeadline(p, r)' = now + 2 * Delta + TimeoutPrecommit(r - 1)
+  <2>3. CascadeDeadline(p, r)' = now + 2 * Delta
     BY <2>1 DEF CascadeDeadline
   <2> QED
     BY <1>r0, <2>2, <2>3, ClockLeFreshDeadline
@@ -153,8 +166,10 @@ LEMMA ProposeExitByDeadlineStepL ==
         BY <2>e, <4>1 DEFS EntriesAtOrAfter, OFF, RoundOrigin
     <3> QED
       BY <1>b, <2>e, <3>1 DEF RoundOrigin
-  <2>ge. enteredAt[p][r] \in Nat /\ enteredAt[p][r] >= GST
-    <3>1. enteredAt[p][r] > GST
+  <2>ge. /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] >= GST
+        /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
+    <3>1. /\ enteredAt[p][r] > GST
+          /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
       BY <2>ro DEF RoundOrigin
     <3> QED
       BY <1>b, <3>1 DEFS OFF, TypeOK
@@ -195,21 +210,26 @@ LEMMA ProposeExitByDeadlineStepL ==
       BY <3>ne, RoundRaiseFrame
     <3>ct. CascadeCeiling(p, r) \in Nat
       BY <1>r0, <2>ge DEF CascadeCeiling
-    <3>ap. AnyPrecommitDated(r - 1, enteredAt[p][r])
+    <3>ap. AnyPrecommitDated(r - 1, enteredAt[p][r] - TimeoutPrecommit(r - 1))
       BY <1>b, <1>r0, <2>ro, EntryCertificateDated
     <3>2. now <= CascadeCeiling(p, r)
       <4> SUFFICES ASSUME now > CascadeCeiling(p, r)
                    PROVE  FALSE
         BY <1>r0, <3>ct
+      <4> DEFINE T == enteredAt[p][r] - TimeoutPrecommit(r - 1)
+      <4>t. /\ T \in Nat
+            /\ T >= GST
+            /\ now > T + Delta + TimeoutPrecommit(r - 1)
+        BY <1>r0, <2>ge, SpreadArithStrict DEF CascadeCeiling
 \* The hypotheses of EntryReachedFromWindow, in its own shape, so that the
 \* unifier has nothing to search for.
       <4>hy. /\ r - 1 \in Rounds
-             /\ enteredAt[p][r] \in Nat
-             /\ enteredAt[p][r] >= GST
-             /\ AnyPrecommitDated(r - 1, enteredAt[p][r])
-             /\ now > enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1)
+             /\ T \in Nat
+             /\ T >= GST
+             /\ AnyPrecommitDated(r - 1, T)
+             /\ now > T + Delta + TimeoutPrecommit(r - 1)
              /\ step[c] # "decided"
-        BY <1>nd, <1>r0, <2>ge, <3>ap DEF CascadeCeiling
+        BY <1>nd, <1>r0, <3>ap, <4>t
       <4>1. round[c] > r - 1
         BY <4>hy, EntryReachedFromWindow
       <4> QED
@@ -378,6 +398,7 @@ NilPrevoteInWindow ==
   \A p \in Honest, r \in Rounds, c \in Honest :
     ( /\ RoundOrigin(p, r)
       /\ Proposer[r] \in Honest
+      /\ TimeoutPropose(r) > 2 * Delta
       /\ Prevote(c, r, nil) \in sent )
     => \/ SomeCorrectDecided
        \/ sentTime[Prevote(c, r, nil)] <= CascadeDeadline(p, r)
@@ -394,6 +415,7 @@ LEMMA NilPrevoteInWindowStepL ==
     BY <2>1 DEFS SentTimeFrozenPred, vars
 <1> SUFFICES ASSUME NEW p \in Honest, NEW r \in Rounds, NEW c \in Honest,
                     RoundOrigin(p, r)', Proposer[r] \in Honest,
+                    TimeoutPropose(r) > 2 * Delta,
                     Prevote(c, r, nil) \in sent',
                     ~ SomeCorrectDecided'
              PROVE  sentTime'[Prevote(c, r, nil)] <= CascadeDeadline(p, r)'
@@ -436,10 +458,10 @@ LEMMA NilPrevoteInWindowStepL ==
   <2>1. enteredAt'[p][r] = now
     BY <1>a, EntryUpdateDisciplineStep
     DEFS EntryUpdateDiscipline, RoundOrigin
-  <2>2. CascadeDeadline(p, r)' = now + 2 * Delta + TimeoutPrecommit(r - 1)
+  <2>2. CascadeDeadline(p, r)' = now + 2 * Delta
     BY <2>1 DEF CascadeDeadline
-  <2>3. /\ now + 2 * Delta + TimeoutPrecommit(r - 1) \in Int
-        /\ now <= now + 2 * Delta + TimeoutPrecommit(r - 1)
+  <2>3. /\ now + 2 * Delta \in Int
+        /\ now <= now + 2 * Delta
     BY <1>r0, CeilingBelowDeadline, ClockLeFreshDeadline
   <2> QED
     BY <1>cl, <1>r0, <2>2, <2>3
@@ -505,24 +527,6 @@ THEOREM NilPrevoteInWindowInv ==
 (***************************************************************************)
 (* Item 13a. The helpers of the joint induction.                           *)
 (***************************************************************************)
-
-\*  The anchor one gossip delay BELOW the ceiling. Every argument that has to
-\*  pass the entry spread is anchored here. A polka that is dated at the
-\*  ceiling is one Delta from every correct validator. The prevote margin of
-\*  Lemma5Timeouts is exactly the slack that this leaves.
-CascadeAnchor(p, r) == enteredAt[p][r] + TimeoutPrecommit(r - 1)
-
-\* Arithmetic in a MINIMAL context. The three dates of the cascade, in order,
-\* with every fact a call site needs.
-LEMMA CascadeDateOrder ==
-  ASSUME NEW e \in Nat, NEW d \in Nat, NEW k \in Nat, d > 1
-  PROVE  /\ e + k \in Nat
-         /\ e + d + k \in Nat
-         /\ e + 2 * d + k \in Nat
-         /\ e <= e + k
-         /\ (e + k) + d = e + d + k
-         /\ (e + d + k) + d = e + 2 * d + k
-BY SMT
 
 \* The whole correct set is a Byzantine quorum, so anything all of it has sent
 \* is a dated certificate. QuorumAvailable is the witness.
@@ -673,6 +677,7 @@ LEMMA NilPrevoteGivesBlocking ==
   ASSUME TypeOK, NilPrevoteInWindow, ~ SomeCorrectDecided,
          NEW p \in Honest, NEW r \in Rounds, NEW c \in Honest,
          RoundOrigin(p, r), Proposer[r] \in Honest,
+         TimeoutPropose(r) > 2 * Delta,
          NilPrevoteBlocks(p, r),
          Prevote(c, r, nil) \in sent,
          NEW v \in Values, NEW vr \in Rounds \cup {-1},
@@ -856,69 +861,30 @@ LEMMA AboveAnchorOrder ==
          /\ n > (n - k) + d
 BY SMT
 
-\* The clock, carried above the deadline by the propose margin.
-LEMMA GeThroughMargin ==
-  ASSUME NEW n \in Int, NEW s \in Int, NEW eh \in Int, NEW e \in Int,
-         NEW tp \in Int, NEW d \in Int, NEW k \in Int,
-         n >= s, s >= eh + tp, eh >= e, tp > 2 * d + k
-  PROVE  n >= e + 2 * d + k
+\* Propose. A correct prevote on propose timeout is dated at or after its
+\* sender's entry plus TimeoutPropose(r). So it is above the ceiling
+\* enteredAt[p][r] + Delta, and above the deadline enteredAt[p][r] + 2 *
+\* Delta.
+LEMMA ProposeClearsShortDeadline ==
+  ASSUME NEW e \in Nat, NEW ey \in Nat, NEW d \in Nat, NEW tp \in Nat,
+         NEW x \in Int, ey >= e, tp > 2 * d, x >= ey + tp
+  PROVE  /\ x > e + d
+         /\ x > e + 2 * d
 BY SMT
 
-\* The anchor of mode 2, and the one place the prevote margin is spent. The
-\* anchor is the later of the arming instant and the entry spread. It therefore
-\* clears the ceiling by a gossip delay, and the fired prevote timer is two
-\* gossip delays above it. One lemma per case: a conclusion that names a free
-\* anchor gives the backend a term to invent, and it does not find it.
-LEMMA PrevoteAnchorAtArming ==
-  ASSUME NEW e \in Nat, NEW k \in Nat, NEW d \in Nat, NEW g \in Nat,
-         NEW q \in Int, NEW tv \in Int, NEW n \in Nat,
-         d > 1, e > g, q >= e, tv > 2 * d + k, n >= q + tv, q >= e + k
+\* Prevote. The arming quorum of a fired prevote timer is dated at Tq, and
+\* Tq >= e, because every correct round-r vote is after the first entry. So
+\* the anchor is Tq. The ceiling is within Delta of Tq, and the clock is more
+\* than 2 * Delta above Tq.
+LEMMA PrevoteAnchorShort ==
+  ASSUME NEW e \in Nat, NEW g \in Nat, NEW d \in Nat, NEW q \in Int,
+         NEW tv \in Nat, NEW n \in Nat,
+         e > g, q >= e, tv > 2 * d, n >= q + tv
   PROVE  /\ q >= g
          /\ e <= q
-         /\ e + d + k <= q + d
+         /\ e + d <= q + d
          /\ n > q + 2 * d
-<1>1. q >= g
-  BY SMT
-<1>2. e <= q
-  OBVIOUS
-<1>3. e + d + k <= q + d
-  BY SMT
-<1>4. n > q + 2 * d
-  BY SMT
-<1> QED
-  BY <1>1, <1>2, <1>3, <1>4
-
-LEMMA PrevotePastTwoDeltas ==
-  ASSUME NEW n \in Nat, NEW q \in Nat, NEW tv \in Int,
-         NEW d \in Nat, NEW k \in Nat,
-         n >= q + tv, tv > 2 * d + k
-  PROVE n > q + 2 * d
 BY SMT
-
-LEMMA PrevoteAnchorAtSpread ==
-  ASSUME NEW e \in Nat, NEW k \in Nat, NEW d \in Nat, NEW g \in Nat,
-         NEW q \in Int, NEW tv \in Int, NEW n \in Nat,
-         d > 1, e > g, q >= e, tv > 2 * d + k, n >= q + tv, ~ (q >= e + k)
-  PROVE  /\ e + k \in Nat
-         /\ e + k >= g
-         /\ e <= e + k
-         /\ q <= e + k
-         /\ e + d + k <= (e + k) + d
-         /\ n > (e + k) + 2 * d
-<1>1. e + k \in Nat
-  OBVIOUS
-<1>2. e + k >= g
-  BY SMT
-<1>3. e <= e + k
-  OBVIOUS
-<1>4. q <= e + k
-  BY SMT
-<1>5. e + d + k <= (e + k) + d
-  BY SMT
-<1>6. n > (e + k) + 2 * d
-  BY SMT
-<1> QED
-  BY <1>1, <1>2, <1>3, <1>4, <1>5, <1>6
 
 -----------------------------------------------------------------------------
 \*  Two readings of the pre-state invariant. The escape does not mention the
@@ -998,7 +964,7 @@ LEMMA AboveGivesEscape ==
 <1> SUFFICES ASSUME ~ CascadeEscape(p, r, v)
              PROVE  FALSE
   OBVIOUS
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
@@ -1091,8 +1057,9 @@ LEMMA NilPrecommitBacking ==
 -----------------------------------------------------------------------------
 \*  A correct prevote at r puts the round-r proposal in the pool. Either the
 \*  prevote read the proposal, or it came from the propose timeout. In the
-\*  second case the propose margin puts the clock above the ceiling, and
-\*  ProposalDated reports the proposal of an honest proposer there.
+\*  second case TimeoutPropose(r) > 2 * Delta puts the clock above the
+\*  ceiling, and ProposalDated reports the proposal of an honest proposer
+\*  there.
 LEMMA ProposalFromCorrectPrevote ==
   ASSUME TypeOK, SentTimeLeNow, PrevoteNeedsProposalOrTimeout, ProposalDated,
          NEW p \in Honest, NEW r \in Rounds, NEW y \in Honest,
@@ -1105,13 +1072,13 @@ LEMMA ProposalFromCorrectPrevote ==
   BY HonestSubValidators, MsgPrevote
 <1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
-       /\ TimeoutPropose(r) \in Int /\ TimeoutPrecommit(r - 1) \in Nat
-       /\ TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+       /\ TimeoutPropose(r) \in Nat
+       /\ TimeoutPropose(r) > 2 * Delta
        /\ sentTime[Prevote(y, r, w)] \in Int
        /\ now >= sentTime[Prevote(y, r, w)]
   <2>0. r > 0
     BY DEF RoundOrigin
-  <2>1. TimeoutPropose(r) \in Int /\ TimeoutPrecommit(r - 1) \in Nat
+  <2>1. TimeoutPropose(r) \in Nat
     BY <2>0, RoundTypes
   <2>2. enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
     BY GSTType DEFS OFF, RoundOrigin, TypeOK
@@ -1142,12 +1109,12 @@ LEMMA ProposalFromCorrectPrevote ==
   <2> QED
     BY <2>1, <2>2
 <1>3. CASE sentTime[Prevote(y, r, w)] >= enteredAt[y][r] + TimeoutPropose(r)
-  <2>e. enteredAt[y][r] \in Int /\ enteredAt[y][r] >= enteredAt[p][r]
+  <2>e. enteredAt[y][r] \in Nat /\ enteredAt[y][r] >= enteredAt[p][r]
     BY <1>1 DEFS EntriesAtOrAfter, OFF, RoundOrigin, TypeOK
-  <2>1. now >= enteredAt[p][r] + 2 * Delta + TimeoutPrecommit(r - 1)
-    BY <1>3, <1>ty, <2>e, GeThroughMargin
+  <2>1. sentTime[Prevote(y, r, w)] > enteredAt[p][r] + Delta
+    BY <1>3, <1>ty, <2>e, ProposeClearsShortDeadline
   <2>2. now > CascadeCeiling(p, r)
-    BY <1>ty, <2>1, DeadlineAboveCeiling DEF CascadeCeiling
+    BY <1>ty, <2>1 DEF CascadeCeiling
   <2> QED
     BY <2>2 DEFS ProposalDated, WRDurable
 <1> QED
@@ -1165,7 +1132,7 @@ LEMMA PreStateProposalForValue ==
          RoundOrigin(p, r), WRDurable(r), ~ SomeCorrectDecided,
          Prevote(y, r, w) \in sent, Justified(r, v, T)'
   PROVE  \E vr2 \in Rounds \cup {-1} : Proposal(Proposer[r], r, v, vr2) \in sent
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>1. PICK v2 \in Values, vr2 \in Rounds \cup {-1} :
         Proposal(Proposer[r], r, v2, vr2) \in sent
@@ -1216,8 +1183,9 @@ LEMMA PrevoteValueIsProposed ==
 \*  Mode 2's core. A dated any-value prevote quorum at r, whose date is a
 \*  whole TimeoutPrevote(r) below the clock, gives the escape. A correct
 \*  member of the quorum either prevoted nil, which gives the lock, or its
-\*  prevote justifies the proposal at the anchor. In the second case clause P
-\*  builds the polka there.
+\*  prevote justifies the proposal at the arming date Tq. In the second case
+\*  clause P builds the polka there. Tq is at or after the entry, so the
+\*  ceiling is within Delta of Tq.
 LEMMA ArmingQuorumGivesEscape ==
   ASSUME TypeOK, SentTimeLeNow, PrevoteJustified, PrevoteOncePerRound,
          HonestProposalUnique, NilPrevoteInWindow, RoundVoteAfterEntry,
@@ -1232,7 +1200,7 @@ LEMMA ArmingQuorumGivesEscape ==
 <1> SUFFICES ASSUME ~ CascadeEscape(p, r, v)
              PROVE  FALSE
   OBVIOUS
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>nd. ~ SomeCorrectDecided /\ ~ BlockingLockDuring(p, r)
   BY DEF CascadeEscape
@@ -1245,12 +1213,12 @@ LEMMA ArmingQuorumGivesEscape ==
   BY <1>1, <1>q, PrevoteValueIsProposed
 <1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
-       /\ TimeoutPrevote(r) \in Int /\ TimeoutPrecommit(r - 1) \in Nat
-       /\ TimeoutPrevote(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+       /\ TimeoutPrevote(r) \in Nat
+       /\ TimeoutPrevote(r) > 2 * Delta
        /\ sentTime[Prevote(y, r, w)] \in Int
   <2>0. r > 0
     BY DEF RoundOrigin
-  <2>1. TimeoutPrevote(r) \in Int /\ TimeoutPrecommit(r - 1) \in Nat
+  <2>1. TimeoutPrevote(r) \in Nat
     BY <2>0, RoundTypes, T0PrevoteType, TDeltaType DEFS Rounds, TimeoutPrevote
   <2>2. enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
     BY GSTType DEFS OFF, RoundOrigin, TypeOK
@@ -1271,43 +1239,14 @@ LEMMA ArmingQuorumGivesEscape ==
   BY <1>3, <1>4, <1>ty, NatFromChain
 <1>6. Justified(r, v, Tq)
   BY <1>2, <1>5, <1>ty DEF PrevoteJustified
-\* The anchor is the later of the arming instant and the entry spread.
-<1>7. CASE Tq >= CascadeAnchor(p, r)
-  <2>1. Tq >= enteredAt[p][r] + TimeoutPrecommit(r - 1)
-    BY <1>7 DEF CascadeAnchor
-  <2>2. /\ Tq >= GST
-        /\ enteredAt[p][r] <= Tq
-        /\ CascadeCeiling(p, r) <= Tq + Delta
-        /\ now > Tq + 2 * Delta
-    <3>1. Tq >= GST
-      BY <1>5, <1>ty, <2>1, PrevoteAnchorAtArming
-    <3>2. enteredAt[p][r] <= Tq
-      BY <1>5, <1>ty, <2>1, PrevoteAnchorAtArming
-    <3>3. CascadeCeiling(p, r) <= Tq + Delta
-      BY <1>5, <1>ty, <2>1, PrevoteAnchorAtArming DEF CascadeCeiling
-    <3>4. now > Tq + 2 * Delta
-      BY <1>5, <1>ty, PrevotePastTwoDeltas
-    <3> QED
-      BY <3>1, <3>2, <3>3, <3>4
-  <2> QED
-    BY <1>5, <1>6, <2>2, CoreJustifiedGivesEscape
-<1>8. CASE ~ (Tq >= CascadeAnchor(p, r))
-  <2>1. ~ (Tq >= enteredAt[p][r] + TimeoutPrecommit(r - 1))
-    BY <1>8 DEF CascadeAnchor
-  <2>2. /\ CascadeAnchor(p, r) \in Nat
-        /\ CascadeAnchor(p, r) >= GST
-        /\ enteredAt[p][r] <= CascadeAnchor(p, r)
-        /\ Tq <= CascadeAnchor(p, r)
-        /\ CascadeCeiling(p, r) <= CascadeAnchor(p, r) + Delta
-        /\ now > CascadeAnchor(p, r) + 2 * Delta
-    BY <1>5, <1>ty, <2>1, PrevoteAnchorAtSpread
-    DEFS CascadeAnchor, CascadeCeiling
-  <2>3. Justified(r, v, CascadeAnchor(p, r))
-    BY <1>5, <1>6, <2>2, JustifiedWeaken
-  <2> QED
-    BY <2>2, <2>3, CoreJustifiedGivesEscape
+\* The anchor is the arming date Tq, which is at or after the entry.
+<1>7. /\ Tq >= GST
+      /\ enteredAt[p][r] <= Tq
+      /\ CascadeCeiling(p, r) <= Tq + Delta
+      /\ now > Tq + 2 * Delta
+  BY <1>5, <1>ty, PrevoteAnchorShort DEF CascadeCeiling
 <1> QED
-  BY <1>7, <1>8
+  BY <1>5, <1>6, <1>7, CoreJustifiedGivesEscape
 
 \* Clause N's content, as a state lemma. A correct nil precommit at r, with the
 \* round-r proposal for v in the pool, gives the escape. It covers a precommit
@@ -1327,7 +1266,7 @@ LEMMA NilPrecommitGivesEscape ==
 <1> SUFFICES ASSUME ~ CascadeEscape(p, r, v)
              PROVE  FALSE
   OBVIOUS
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>nd. ~ SomeCorrectDecided /\ ~ BlockingLockDuring(p, r)
   BY DEF CascadeEscape
@@ -1374,7 +1313,7 @@ LEMMA PrevoteAtQuietClock ==
              PROVE  /\ Prevote(c, r, v) \in sent
                     /\ sentTime[Prevote(c, r, v)] <= T + Delta
   OBVIOUS
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>nd. ~ SomeCorrectDecided /\ ~ BlockingLockDuring(p, r)
   BY DEF CascadeEscape
@@ -1401,10 +1340,17 @@ LEMMA PrevoteAtQuietClock ==
   <2> SUFFICES ASSUME round[c] < r
                PROVE  FALSE
     OBVIOUS
-  <2>1. AnyPrecommitDated(r - 1, enteredAt[p][r])
+  <2>1. AnyPrecommitDated(r - 1, enteredAt[p][r] - TimeoutPrecommit(r - 1))
     BY EntryCertificateDated DEFS OFF, RoundOrigin
-  <2>2. now >= enteredAt[p][r] + Delta + TimeoutPrecommit(r - 1)
+  <2>0. enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
+    BY DEF RoundOrigin
+  <2>g. now >= enteredAt[p][r] + Delta
     BY <1>ty DEF CascadeCeiling
+  <2> DEFINE Tc == enteredAt[p][r] - TimeoutPrecommit(r - 1)
+  <2>2. /\ Tc \in Nat
+        /\ Tc >= GST
+        /\ now >= Tc + Delta + TimeoutPrecommit(r - 1)
+    BY <1>ty, <2>0, <2>g, SpreadArith
   <2>3. r - 1 \in Rounds
     BY <1>ty DEF Rounds
   <2>4. round[c] > r - 1
@@ -1450,7 +1396,7 @@ LEMMA PrecommitAtQuietClock ==
 <1> SUFFICES ASSUME ~ CascadeEscape(p, r, v)
              PROVE  Precommit(c, r, v) \in sent
   OBVIOUS
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>nd. ~ SomeCorrectDecided /\ ~ BlockingLockDuring(p, r)
   BY DEF CascadeEscape
@@ -1539,8 +1485,8 @@ LEMMA Lemma5HypGivesCascadeCore ==
   PROVE  CascadeCore(p, r)
 <1>dur. RoundOrigin(p, r) /\ WRDurable(r)
   BY Lemma5HypDurable DEF CascadeDurable
-<1>q. Proposer[r] \in Honest
-  BY DEF Lemma5Hyp
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
+  BY DEFS Lemma5Hyp, Lemma5Timeouts
 <1>now. now = enteredAt[p][r]
   BY DEFS FirstToEnter, Lemma5Hyp
 <1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
@@ -1685,7 +1631,7 @@ LEMMA CascadeCoreStepL ==
                           => \/ Precommit(c, r, v) \in sent'
                              \/ CascadeEscape(p, r, v)'  )
   BY DEF CascadeCore
-<1>q. Proposer[r] \in Honest
+<1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
 <1>ea. enteredAt'[p][r] = enteredAt[p][r]
   BY EnteredAtFrozenStep DEFS OFF, RoundOrigin
@@ -1964,4 +1910,5 @@ THEOREM CascadeCoreLatch ==
      PTL
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

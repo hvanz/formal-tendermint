@@ -166,26 +166,19 @@ ASSUME QuorumAvailable ==
   \E Q \in ByzQuorum : Q \subseteq Honest
 
 \* ---- Timing constants ----------------------------------------------------
-\* Delta > 0 (not just \in Nat): the post-GST delivery deadline
-\* (IF sentTime >= GST THEN sentTime ELSE GST) + Delta collapses to exactly
-\* GST at the pre/post-GST boundary (now = GST) when Delta = 0, so Tick's
-\* deadline guard there reduces to PendingDeliveries = {} -- a condition a
-\* perpetually-sending Faulty validator can keep un-satisfied forever
-\* (the clock-reachability boundary case in the termination proof). Matches
-\* the positivity already required of T0Propose/T0Prevote/T0Precommit below; no
-\* proof or MC configuration relies on Delta = 0.
+\* Delta > 1. The assumption excludes Delta = 0 for this reason. The delivery
+\* deadline (IF sentTime >= GST THEN sentTime ELSE GST) + Delta is then
+\* exactly GST at now = GST. The deadline guard of Tick then reduces to
+\* PendingDeliveries = {}, and a faulty validator that sends forever can keep
+\* that condition false (the clock-reachability boundary case in the
+\* termination proof). The arithmetic lemmas of the termination proof also
+\* take Delta > 1 as a premise. Every MC configuration uses Delta >= 2.
 ASSUME DeltaType  == Delta \in Nat /\ Delta > 1
 ASSUME GSTType    == GST    \in Nat
 ASSUME T0ProposeType   == T0Propose   \in Nat /\ T0Propose   > 0
 ASSUME T0PrevoteType   == T0Prevote   \in Nat /\ T0Prevote   > 0
 ASSUME T0PrecommitType == T0Precommit \in Nat /\ T0Precommit > 0
 ASSUME TDeltaType == TDelta \in Nat /\ TDelta > 0
-
-\* Paper Lemma 5 condition 4 for the linear timeout functions. The round
-\* term cancels, so these constant margins establish the required propose
-\* and prevote inequalities at every round.
-ASSUME ProposeTimeoutMargin == T0Propose + TDelta > 2 * Delta + T0Precommit
-ASSUME PrevoteTimeoutMargin == T0Prevote + TDelta > 2 * Delta + T0Precommit
 
 (***************************************************************************)
 (* Types and operators (identical to TendermintByzantine.tla)              *)
@@ -724,5 +717,6 @@ Termination ==
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Last modified Aug 4 2026 by hvanz (Hernán Vanzetto)
 \* Created Jun 10 2026 by hvanz (Hernán Vanzetto)

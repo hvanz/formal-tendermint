@@ -75,12 +75,13 @@ FirstToEnter(p, r) ==
   /\ \A c \in Honest : enteredAt[c][r] = OFF \/ enteredAt[c][r] >= now
 
 Lemma5Timeouts(r) ==
-  /\ TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
-  /\ TimeoutPrevote(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ TimeoutPropose(r) > 2 * Delta
+  /\ TimeoutPrevote(r) > 2 * Delta
   /\ TimeoutPrecommit(r) > 2 * Delta
 
 Lemma5Hyp(p, r) ==
   /\ now > GST
+  /\ now >= GST + TimeoutPrecommit(r - 1)
   /\ r > 0
   /\ FirstToEnter(p, r)
   /\ Proposer[r] \in Honest
@@ -90,8 +91,8 @@ Lemma5Hyp(p, r) ==
 WRDurable(r) ==
   /\ now >= GST
   /\ Proposer[r] \in Honest
-  /\ TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
-  /\ TimeoutPrevote(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ TimeoutPropose(r) > 2 * Delta
+  /\ TimeoutPrevote(r) > 2 * Delta
   /\ TimeoutPrecommit(r) > 2 * Delta
 
 AllPrevotedBy(p, r) ==
@@ -100,7 +101,7 @@ AllPrevotedBy(p, r) ==
        /\ Valid(v)
        /\ \E vr \in {-1} \cup Rounds : Proposal(Proposer[r], r, v, vr) \in sent
        /\ \A c \in Honest : VotedPrevote(c, v, r)
-  /\ now <= enteredAt[p][r] + 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ now <= enteredAt[p][r] + 2 * Delta
 
 AllPrecommittedBy(p, r) ==
   /\ WRDurable(r)
@@ -108,7 +109,7 @@ AllPrecommittedBy(p, r) ==
        /\ Valid(v)
        /\ \E vr \in {-1} \cup Rounds : Proposal(Proposer[r], r, v, vr) \in sent
        /\ \A c \in Honest : VotedPrecommit(c, v, r)
-  /\ now <= enteredAt[p][r] + 3 * Delta + TimeoutPrecommit(r - 1)
+  /\ now <= enteredAt[p][r] + 3 * Delta
 
 (***************************************************************************)
 (* Phase 1 predicates mirrored from the proof module for TLC.              *)
@@ -124,6 +125,7 @@ MCRoundOrigin(p, r) ==
   /\ r > 0
   /\ enteredAt[p][r] # OFF
   /\ enteredAt[p][r] > GST
+  /\ enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
   /\ \A c \in Honest :
        enteredAt[c][r] = OFF \/ enteredAt[c][r] >= enteredAt[p][r]
 
@@ -148,7 +150,7 @@ MCPrevoteStage(p, r, v) ==
   /\ \E vr \in {-1} \cup Rounds : Proposal(Proposer[r], r, v, vr) \in sent
   /\ \A c \in Honest : VotedPrevote(c, v, r)
   /\ MCPrevoteControlReady(r, v)
-  /\ now <= enteredAt[p][r] + 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ now <= enteredAt[p][r] + 2 * Delta
 
 MCPrecommitStage(p, r, v) ==
   /\ MCRoundOrigin(p, r)
@@ -162,7 +164,7 @@ MCPrecommitStage(p, r, v) ==
        \/ /\ round[c] = r
           /\ step[c] \in {"precommit", "decided"}
           /\ (timer[c]["precommit"] = OFF \/ now < timer[c]["precommit"])
-  /\ now <= enteredAt[p][r] + 3 * Delta + TimeoutPrecommit(r - 1)
+  /\ now <= enteredAt[p][r] + 3 * Delta
 
 MCPostGSTPriorRoundLock(r) ==
   \E w \in Values, c \in Honest, lr \in Rounds :
@@ -349,19 +351,18 @@ MCOldDefectExcluded ==
 (*                                                                         *)
 (* The schedule is tightly constrained. A change to any timing constant    *)
 (* stalls it, and does not merely slow it down. At Delta = 2:              *)
-(* - T0Propose = 7 is FORCED. ProposeTimeoutMargin forces it, and          *)
-(*   TimeoutPropose(2) > 2*Delta + TimeoutPrecommit(1) of WRDurable(2)     *)
-(*   forces it independently.                                              *)
+(* - T0Propose = 7 is FORCED. The script Ticks seven times before the      *)
+(*   round-0 propose timeouts. With T0Propose = 6, the propose timers      *)
+(*   expire at now = 6, and the seventh Tick is not enabled.               *)
 (* - The propose timeout of round 1 must not fire after the round-0        *)
 (*   precommit timeout of h3. That needs T0Propose + TDelta <= k +         *)
 (*   T0Precommit for the k Ticks that follow the entry into round 1, so k  *)
 (*   = 5.                                                                  *)
 (* - The Gossip deadline caps that run of Ticks. A pending message from    *)
 (*   before GST forbids a Tick once now + 1 >= GST + Delta, so GST = 14.   *)
-(* - h1, h2 and h3 all schedule their round-1 precommit timers at now =    *)
-(*   18. Those three timeouts therefore fire together at now = 22, and no  *)
-(*   Tick separates them.                                                  *)
-(* The run ends at now = 22, with mcStep = 65.                             *)
+(* - At now = 18, h1, h2 and h3 all schedule their round-1 precommit       *)
+(*   timers. Those three timeouts therefore fire together at now = 22, and *)
+(*   no Tick separates them. The run ends at now = 22, with mcStep = 65.   *)
 (***************************************************************************)
 MCPhase2EntryNext ==
   \/ MCTake(0, Tick)
@@ -664,9 +665,10 @@ MCLockRelativizeTerminal ==
 (* constrains it. The equivocating round-0 prevote of b completes the      *)
 (* polka of h3 at now = 5. h3 value-precommits at round 0, at the instant  *)
 (* of the round-1 entry, with TimeoutPrecommit(0) = 3 > Delta = 2.         *)
-(* Lemma5Hyp("h1", 1) and MCBlockingLockDuring("h1", 1) both hold there.   *)
-(* This is therefore a genuine disruption of a good round, and not an      *)
-(* off-path state.                                                         *)
+(* MCBlockingLockDuring("h1", 1) holds there, so this is a disruption of a *)
+(* reachable round entry, and not an off-path state. Lemma5Hyp("h1", 1) is *)
+(* false there, because h1 enters round 1 at now = 5, and the late-entry   *)
+(* conjunct needs now >= GST + TimeoutPrecommit(0) = 7.                    *)
 (***************************************************************************)
 MCLateValueLockWindow ==
   \A c \in Honest, w \in Values, lr \in Rounds, p \in Honest, r \in Rounds :
@@ -692,7 +694,8 @@ MCLateValueLockWindowRepaired ==
 \* Separates a stalled script from a real property violation.
 MCWindowGstComplete == <>(mcStep = 24)
 
-\* The disruption is at a good round: both hold at mcStep 24.
+\* The disruption is reached. At mcStep 24, MCBlockingLockDuring holds, and
+\* Lemma5Hyp does not hold (see above).
 MCWindowGstDisrupted ==
   <>(Lemma5Hyp("h1", 1) \/ MCBlockingLockDuring("h1", 1))
 
@@ -743,4 +746,5 @@ MCSpec == MCInit /\ [][MCNext]_mcVars /\ WF_mcVars(MCNext)
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

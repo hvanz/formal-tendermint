@@ -254,6 +254,7 @@ SelectedEntry(d) ==
   \E b \in Rounds :
     /\ Proposer[b] = d
     /\ b > 0
+    /\ b > GST
     /\ now > GST
     /\ Lemma5Timeouts(b)
     /\ FreshEntry(b)
@@ -413,18 +414,6 @@ LEMMA StableDominatorElim ==
   PROVE  D
 BY DEF SomeStableDominator
 
-\* ---- The state implication the composition module glues with -------------
-\* A selected entry whose proposer dominates at that instant IS a Lemma 5
-\* hypothesis state. Kept here, in a clean Spec-free context, so PTL can
-\* necessitate it.
-LEMMA SelectedGoodRoundBox ==
-  ASSUME NEW d \in Honest
-  PROVE  [](SelectedEntry(d) /\ EntryDominator(d) => GoodRoundExists)
-<1>1. SelectedEntry(d) /\ EntryDominator(d) => GoodRoundExists
-  BY DEFS EntryDominator, FreshEntry, GoodRoundExists, Lemma5Hyp, SelDominates, SelectedEntry
-<1> QED
-  BY <1>1, PTL
-
 \* The round latch that turns a one-shot round advance into a recurrence:
 \* rounds never go down, so "some correct is above b" sticks.
 LEMMA SelRoundAboveLatchBox ==
@@ -437,4 +426,5 @@ LEMMA SelRoundAboveLatchBox ==
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

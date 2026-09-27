@@ -77,12 +77,13 @@ MCFrontierProposer ==
 (* specification.                                                          *)
 (***************************************************************************)
 MCLemma5Timeouts(r) ==
-  /\ TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
-  /\ TimeoutPrevote(r) > 2 * Delta + TimeoutPrecommit(r - 1)
+  /\ TimeoutPropose(r) > 2 * Delta
+  /\ TimeoutPrevote(r) > 2 * Delta
   /\ TimeoutPrecommit(r) > 2 * Delta
 
 MCLemma5Hyp(p, r) ==
   /\ now > GST
+  /\ now >= GST + TimeoutPrecommit(r - 1)
   /\ r > 0
   /\ MCFirstToEnter(p, r)
   /\ Proposer[r] \in Honest
@@ -337,4 +338,5 @@ MCProposerStrengthening ==
 
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)

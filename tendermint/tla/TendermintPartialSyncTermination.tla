@@ -671,54 +671,128 @@ LEMMA DecisionPropagates ==
 (***************************************************************************)
 
 \* ---- Lemma 5 condition 4 beyond a round ----------------------------------
-\* Only the precommit inequality grows with the round, so TDelta > 0 carries
-\* that one past any Delta. The propose inequality and the prevote inequality
-\* do NOT grow. Each r*TDelta term cancels against TimeoutPrecommit(r - 1).
-\* That leaves the two constant premises ProposeTimeoutMargin and
-\* PrevoteTimeoutMargin, and TendermintPartialSync assumes both. Without them NO
-\* round satisfies condition 4, and Lemma5OrPriorLock could never be applied.
+\* Each timeout grows with the round, because TDelta > 0. So at every round
+\* r >= 2 * Delta, each of the three timeouts is above 2 * Delta.
 LEMMA MulGeSelf ==
   ASSUME NEW a \in Nat, NEW b \in Nat, b >= 1
   PROVE  a * b >= a
 BY SMT
 
-LEMMA MulPred ==
-  ASSUME NEW a \in Nat, NEW b \in Nat, a >= 1
-  PROVE  (a - 1) * b = a * b - b
+LEMMA BaseAboveTwoDelta ==
+  ASSUME NEW t0 \in Nat, t0 > 0, NEW m \in Nat, NEW rr \in Nat,
+         NEW d \in Nat, m >= rr, rr >= 2 * d
+  PROVE  t0 + m > 2 * d
 BY SMT
 
 LEMMA Lemma5TimeoutsBeyond ==
   ASSUME NEW r \in Rounds, r >= 2 * Delta
   PROVE  Lemma5Timeouts(r)
-<1>d. Delta \in Nat /\ Delta > 0 /\ TDelta \in Nat /\ TDelta >= 1
-  BY DeltaType, TDeltaType
-<1>r. r \in Nat /\ r >= 1
-  BY <1>d DEF Rounds
-<1>m. r * TDelta \in Nat /\ r * TDelta >= r
-  BY <1>d, <1>r, MulGeSelf
-<1>1. TimeoutPrevote(r) > 2 * Delta + TimeoutPrecommit(r - 1)
-  <2>1. (r - 1) * TDelta = r * TDelta - TDelta
-    BY <1>d, <1>r, MulPred
-  <2>2. TimeoutPrecommit(r - 1) = T0Precommit + r * TDelta - TDelta
-    BY <2>1 DEF TimeoutPrecommit
-  <2> QED
-    BY <2>2, <1>d, <1>r, <1>m, PrevoteTimeoutMargin, T0PrevoteType,
-       T0PrecommitType, SMT DEF TimeoutPrevote
-<1>2. TimeoutPrecommit(r) > 2 * Delta
-  BY <1>d, <1>r, <1>m, T0PrecommitType, SMT DEF TimeoutPrecommit
-<1>3. TimeoutPropose(r) > 2 * Delta + TimeoutPrecommit(r - 1)
-  <2>1. (r - 1) * TDelta = r * TDelta - TDelta
-    BY <1>d, <1>r, MulPred
-  <2>2. TimeoutPrecommit(r - 1) = T0Precommit + r * TDelta - TDelta
-    BY <2>1 DEF TimeoutPrecommit
-  <2> QED
-    BY <2>2, <1>d, <1>r, <1>m, ProposeTimeoutMargin, T0ProposeType, T0PrecommitType,
-       SMT DEF TimeoutPropose
+<1>1. r \in Nat /\ TDelta \in Nat /\ TDelta >= 1 /\ Delta \in Nat
+  BY DeltaType, TDeltaType DEF Rounds
+<1>2. r * TDelta \in Nat /\ r * TDelta >= r
+  BY <1>1, MulGeSelf
+<1>3. T0Propose + r * TDelta > 2 * Delta
+  BY <1>1, <1>2, T0ProposeType, BaseAboveTwoDelta
+<1>4. T0Prevote + r * TDelta > 2 * Delta
+  BY <1>1, <1>2, T0PrevoteType, BaseAboveTwoDelta
+<1>5. T0Precommit + r * TDelta > 2 * Delta
+  BY <1>1, <1>2, T0PrecommitType, BaseAboveTwoDelta
 <1> QED
-  BY <1>1, <1>2, <1>3 DEF Lemma5Timeouts
+  BY <1>3, <1>4, <1>5
+  DEFS Lemma5Timeouts, TimeoutPropose, TimeoutPrevote, TimeoutPrecommit
 
 LEMMA TimeoutsSufficientBeyondL == TimeoutsSufficientBeyond
 BY Lemma5TimeoutsBeyond DEF TimeoutsSufficientBeyond
+
+\* ---- Lemma 5 clause (1): every correct entry into a round r > GST is late
+\* CrossingBacked dates a round-(r - 1) precommit quorum at or below
+\* enteredAt[p][r] - TimeoutPrecommit(r - 1). The quorum has a correct member
+\* h. The precommit of h is sent after h entered r - 1, and that entry is at
+\* a time >= r - 1 >= GST.
+LEMMA ChainArith ==
+  ASSUME NEW e \in Nat, NEW k \in Nat, NEW st \in Nat, NEW eh \in Nat,
+         NEW rr \in Nat, NEW g \in Nat,
+         st <= e - k, eh <= st, eh >= rr - 1, rr > g
+  PROVE  e >= g + k
+BY SMT
+
+LEMMA EntryLateAfterGST ==
+  ASSUME TypeOK, CrossingBacked, HonestMessageAfterEntry, EntryTimeGeRound,
+         NEW p \in Honest, NEW r \in Rounds, r > 0, r > GST,
+         enteredAt[p][r] # OFF
+  PROVE  enteredAt[p][r] >= GST + TimeoutPrecommit(r - 1)
+<1>ty. /\ r \in Nat /\ r - 1 \in Rounds /\ r - 1 < r
+       /\ TimeoutPrecommit(r - 1) \in Nat
+       /\ enteredAt[p][r] \in Nat /\ GST \in Nat
+  BY T0PrecommitType, TDeltaType, GSTType DEFS OFF, Rounds, TimeoutPrecommit, TypeOK
+<1>1. PICK Q \in ByzQuorum :
+        \A s \in Q : \E v \in ValuesOrNil :
+          /\ Precommit(s, r - 1, v) \in sent
+          /\ sentTime[Precommit(s, r - 1, v)]
+               <= enteredAt[p][r] - TimeoutPrecommit(r - 1)
+  BY <1>ty DEF CrossingBacked
+<1>2. PICK h \in Q : h \in Honest
+  BY ByzQuorumIntersection
+<1>3. PICK v \in ValuesOrNil :
+        /\ Precommit(h, r - 1, v) \in sent
+        /\ sentTime[Precommit(h, r - 1, v)]
+             <= enteredAt[p][r] - TimeoutPrecommit(r - 1)
+  BY <1>1, <1>2
+<1>4. /\ enteredAt[h][r - 1] # OFF
+      /\ enteredAt[h][r - 1] <= sentTime[Precommit(h, r - 1, v)]
+  BY <1>2, <1>3 DEFS HonestMessageAfterEntry, HonestMessageEntryOK, Precommit
+<1>5. enteredAt[h][r - 1] >= r - 1
+  BY <1>2, <1>4, <1>ty DEF EntryTimeGeRound
+<1>6. /\ sentTime[Precommit(h, r - 1, v)] \in Nat
+      /\ enteredAt[h][r - 1] \in Nat
+  BY <1>2, <1>3, <1>4, <1>ty DEFS OFF, sent, TypeOK
+<1> QED
+  BY <1>3, <1>4, <1>5, <1>6, <1>ty, ChainArith
+
+LEMMA FirstEntryLateAfterGST ==
+  ASSUME TypeOK, CrossingBacked, HonestMessageAfterEntry, EntryTimeGeRound,
+         NEW p \in Honest, NEW r \in Rounds, r > 0, r > GST,
+         FirstToEnter(p, r)
+  PROVE  now >= GST + TimeoutPrecommit(r - 1)
+<1>1. enteredAt[p][r] = now /\ now \in Nat
+  BY DEFS FirstToEnter, TypeOK
+<1>2. enteredAt[p][r] # OFF
+  BY <1>1 DEF OFF
+<1> QED
+  BY <1>1, <1>2, EntryLateAfterGST
+
+\* The invariants that the late entry needs, as one named atom for PTL.
+LateEntryInv ==
+  TypeOK /\ CrossingBacked /\ HonestMessageAfterEntry /\ EntryTimeGeRound
+
+THEOREM LateEntryInvThm == ASSUME Spec PROVE []LateEntryInv
+BY InvProof, CrossingBackedInv, HonestMessageAfterEntryInv,
+   EntryTimeGeRoundInv, PTL DEFS Inv, LateEntryInv
+
+\* A selected entry whose proposer dominates at that instant IS a Lemma 5
+\* hypothesis state. Kept in a clean Spec-free context, so PTL can
+\* necessitate it.
+LEMMA SelectedGoodRoundBox ==
+  ASSUME NEW d \in Honest
+  PROVE  [](LateEntryInv /\ SelectedEntry(d) /\ EntryDominator(d)
+              => GoodRoundExists)
+<1>1. LateEntryInv /\ SelectedEntry(d) /\ EntryDominator(d) => GoodRoundExists
+  <2> SUFFICES ASSUME LateEntryInv, SelectedEntry(d), EntryDominator(d)
+               PROVE  GoodRoundExists
+    OBVIOUS
+  <2>1. PICK b \in Rounds :
+          /\ Proposer[b] = d /\ b > 0 /\ b > GST /\ now > GST
+          /\ Lemma5Timeouts(b) /\ FreshEntry(b)
+    BY DEF SelectedEntry
+  <2>2. PICK p \in Honest : FirstToEnter(p, b)
+    BY <2>1 DEF FreshEntry
+  <2>3. now >= GST + TimeoutPrecommit(b - 1)
+    BY <2>1, <2>2, FirstEntryLateAfterGST DEF LateEntryInv
+  <2> QED
+    BY <2>1, <2>2, <2>3
+    DEFS EntryDominator, FreshEntry, GoodRoundExists, Lemma5Hyp, SelDominates
+<1> QED
+  BY <1>1, PTL
 
 \* ---- Selection ingredient 4: the dominating process proposes again --------
 ProposerRecurrence ==
@@ -866,10 +940,13 @@ THEOREM GoodRoundFromDominator ==
   BY <1>bd, SelectedEntryRecurs
 <1>cc. []<>(SelectedEntry(d) /\ EntryDominator(d))
   BY <1>e, PTL
-<1>g. [](SelectedEntry(d) /\ EntryDominator(d) => GoodRoundExists)
+<1>inv. []LateEntryInv
+  BY LateEntryInvThm
+<1>g. [](LateEntryInv /\ SelectedEntry(d) /\ EntryDominator(d)
+         => GoodRoundExists)
   BY SelectedGoodRoundBox
 <1> QED
-  BY <1>cc, <1>g, PTL
+  BY <1>cc, <1>g, <1>inv, PTL
 
 THEOREM GoodRoundRecurrence ==
   ASSUME Spec, ProposerRecurrence, TimeoutsSufficientBeyond,
@@ -952,4 +1029,5 @@ THEOREM TerminationThm == Spec => Termination
   BY <1>3, AllDecidedLeadsToEach
 =============================================================================
 \* Modification History
+\* Last modified Sep 27 2026 by hvanz (Hernán Vanzetto)
 \* Created Aug 4 2026 by hvanz (Hernán Vanzetto)
