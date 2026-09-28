@@ -99,15 +99,16 @@ CONSTANTS
 \* The honest validators: everyone who is not faulty.
 Honest == Validators \ Faulty
 
-\* Algorithm 1's increasing timeouts: timeoutX(r) = initTimeoutX + r*timeoutDelta
-\* (paper, Section III). Three DISTINCT functions sharing the per-round increment
-\* TDelta, so the within-round decision theorem (paper Lemma 5, condition 4) can
-\* state the per-timeout inequalities verbatim:
+\* Algorithm 1's increasing timeouts: timeoutX(r) = initTimeoutX +
+\* r*timeoutDelta (paper, Section III). Three DISTINCT functions sharing the
+\* per-round increment TDelta, so the within-round decision theorem (paper
+\* Lemma 5, condition 4) can state one inequality for each timeout. The
+\* paper's condition 4 is
 \*   timeoutPropose(r) > 2*Delta + timeoutPrecommit(r-1),
 \*   timeoutPrevote(r) > 2*Delta, timeoutPrecommit(r) > 2*Delta.
-\* (Earlier this layer collapsed all three into one TimeoutDur, since only the
-\* unbounded GROWTH in r matters for the liveness argument; the split is needed
-\* only to transcribe Lemma 5's hypothesis, not by the dynamics.)
+\* The proof adds a late-entry conjunct to condition 1, and then it needs
+\* only TimeoutX(r) > 2*Delta for each X (Lemma5Timeouts in
+\* ...TerminationBase).
 TimeoutPropose(r)   == T0Propose   + r * TDelta
 TimeoutPrevote(r)   == T0Prevote   + r * TDelta
 TimeoutPrecommit(r) == T0Precommit + r * TDelta
@@ -166,14 +167,16 @@ ASSUME QuorumAvailable ==
   \E Q \in ByzQuorum : Q \subseteq Honest
 
 \* ---- Timing constants ----------------------------------------------------
-\* Delta > 1. The assumption excludes Delta = 0 for this reason. The delivery
-\* deadline (IF sentTime >= GST THEN sentTime ELSE GST) + Delta is then
-\* exactly GST at now = GST. The deadline guard of Tick then reduces to
-\* PendingDeliveries = {}, and a faulty validator that sends forever can keep
-\* that condition false (the clock-reachability boundary case in the
-\* termination proof). The arithmetic lemmas of the termination proof also
-\* take Delta > 1 as a premise. Every MC configuration uses Delta >= 2.
-ASSUME DeltaType  == Delta \in Nat /\ Delta > 1
+\* Delta > 0. Delta is the paper's Delta: after GST, a message sent at time t
+\* reaches every correct validator by max(t, GST) + Delta. Tick may reach the
+\* deadline of a pending message, but it may not pass it.
+\* With Delta = 0, a message sent at the current time after GST has its
+\* deadline at now, so it blocks Tick. A faulty validator that sends a new
+\* message after each delivery then stops the clock. No timeout fires, and
+\* Termination is false. The termination proof uses Delta > 0 in
+\* EmptyFrontierDeadlineOk: a message sent at the current time does not block
+\* Tick.
+ASSUME DeltaType  == Delta \in Nat /\ Delta > 0
 ASSUME GSTType    == GST    \in Nat
 ASSUME T0ProposeType   == T0Propose   \in Nat /\ T0Propose   > 0
 ASSUME T0PrevoteType   == T0Prevote   \in Nat /\ T0Prevote   > 0
@@ -610,7 +613,7 @@ TickUseful ==
 Tick ==
   /\ TickUseful
   /\ ~ \E p \in Honest : CanCompute(p)                             \* maximal progress
-  /\ \A pm \in PendingDeliveries : now + 1 < DeliveryDeadline(pm[2])
+  /\ \A pm \in PendingDeliveries : now < DeliveryDeadline(pm[2])
   /\ now' = now + 1
   /\ UNCHANGED << round, step, locked, valid, decision, sentTime, rcvd, timer, enteredAt, decidedRound >>
 

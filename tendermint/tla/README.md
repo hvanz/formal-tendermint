@@ -66,6 +66,12 @@ Then the entry spread of round r is `Delta`. Lemma 7 proves this conjunct at
 every round r > GST. The model `TendermintPartialSyncTerminationEntrySpreadMC`
 shows a round with `t > GST` alone that cannot decide.
 
+`Delta` is the paper's Δ. After GST, a message sent at time t reaches every
+correct validator by `max(t, GST) + Delta`, because `Tick` may reach the
+deadline of a pending message but may not pass it. The only assumption on
+`Delta` is `Delta > 0`. With `Delta = 0`, a message sent at the current time
+blocks `Tick`, and a faulty validator that sends without end stops the clock.
+
 The termination proof reuses the safety results.
 `TendermintPartialSyncTerminationBase` extends
 `TendermintPartialSyncRefinement`. The transferred invariants are therefore

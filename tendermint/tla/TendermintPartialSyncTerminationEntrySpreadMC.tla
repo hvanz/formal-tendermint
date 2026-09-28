@@ -9,10 +9,11 @@
 (*                                                                         *)
 (* The cause is the entry spread. The round-0 certificate of h1 and h3 is  *)
 (* sent before GST, so its deadline is GST + Delta, and h2 can receive it  *)
-(* as late as now = GST + Delta - 1 = 7. With t > GST alone, only Delta +  *)
-(* TimeoutPrecommit(0) bounds the entry spread of round 1, not Delta. In   *)
-(* the trace, h1 and h3 enter round 1 at now = 7. Their propose timers     *)
-(* expire at now = 12, before h2 enters round 1.                           *)
+(* as late as now = GST + Delta = 8, and the script gives it at now = 7.   *)
+(* With t > GST alone, only Delta + TimeoutPrecommit(0) bounds the entry   *)
+(* spread of round 1, not Delta. In the trace, h1 and h3 enter round 1 at  *)
+(* now = 7. Their propose timers expire at now = 12, before h2 enters      *)
+(* round 1.                                                                *)
 (*                                                                         *)
 (* The late entry of Lemma5Hyp, now >= GST + TimeoutPrecommit(r - 1), is   *)
 (* false at this entry, and MCLateEntryFalseAtEntry checks that. The long  *)
@@ -111,7 +112,7 @@ MCNext ==
   \* h1 and h3 have the round-0 certificate at now = 1, before GST.
   \/ MCTake(12, ScheduleTimeoutPrecommit("h1"))              \* deadline 7
   \/ MCTake(13, ScheduleTimeoutPrecommit("h3"))              \* deadline 7
-  \* h2 gets nothing before GST + Delta - 1 = 7.
+  \* The script gives h2 nothing before now = 7.
   \/ MCTake(14, Tick)                                        \* now = 2
   \/ MCTake(15, Tick)
   \/ MCTake(16, Tick)
