@@ -404,18 +404,18 @@ LEMMA TickIncrements ==
 BY DEF Tick
 
 \* Pre-GST the delivery-deadline constraint never blocks Tick: for any
-\* pending pm, DeliveryDeadline(pm[2]) >= GST + Delta >= GST >= now + 1.
+\* pending pm, DeliveryDeadline(pm[2]) >= GST + Delta >= GST > now.
 LEMMA PreGSTDeadlineOk ==
   ASSUME TypeOK, now < GST,
          NEW pm \in PendingDeliveries
-  PROVE  now + 1 < DeliveryDeadline(pm[2])
+  PROVE  now < DeliveryDeadline(pm[2])
 BY DeltaType, GSTType DEFS DeliveryDeadline, OFF, PendingDeliveries, sent, TypeOK
 
-\* Timestamp-aware form of the same strict pre-GST fact.
+\* Timestamp-aware form of the same pre-GST fact.
 LEMMA DeadlineOkThroughGST ==
   ASSUME TypeOK, SentTimeLeNow, now < GST,
          NEW pm \in PendingDeliveries
-  PROVE  now + 1 < DeliveryDeadline(pm[2])
+  PROVE  now < DeliveryDeadline(pm[2])
 BY DeltaType, GSTType DEFS DeliveryDeadline, OFF, PendingDeliveries, sent, SentTimeLeNow, TypeOK
 
 \* ---- ENABLED <<Tick>>_vars reduces to its three unprimed guards ----------
@@ -430,9 +430,20 @@ LEMMA TickEnabledFromGuards ==
   ASSUME TypeOK,
          TickUseful,
          ~ \E p \in Honest : CanCompute(p),
-         \A pm \in PendingDeliveries : now + 1 < DeliveryDeadline(pm[2])
+         \A pm \in PendingDeliveries : now < DeliveryDeadline(pm[2])
   PROVE  ENABLED <<Tick>>_vars
 BY ExpandENABLED DEFS Tick, TypeOK, vars
+
+\* The deadline conjunct of Tick, as its own operator. It holds in the
+\* pre-state of each Tick. The maximal-progress ceilings read it there: a
+\* message dated at or below T after GST is in every correct rcvd when a Tick
+\* leaves now = T + Delta (DeliveredAtTick in ...RoundProgress).
+DeadlinesAhead == \A pm \in PendingDeliveries : now < DeliveryDeadline(pm[2])
+
+LEMMA TickGivesDeadlines ==
+  ASSUME Tick
+  PROVE  DeadlinesAhead
+BY DEFS DeadlinesAhead, Tick
 
 \* Tick is ENABLED from FULL quiescence, given a live timer, which is
 \* TickUseful. Full quiescence means that everything is delivered, so
@@ -1090,19 +1101,19 @@ LEMMA SentTimeFrozenStepL ==
 THEOREM SentTimeFrozenInv == ASSUME Spec PROVE [][SentTimeFrozenPred]_vars
 BY InvProof, PTL, SentInvInv, SentTimeFrozenStepL DEFS Inv, Spec
 
-\* The WF1 region: m is sent, not yet received by c, its timestamp is <= t0, and
-\* the clock sits in the post-GST window [GST, t0+Delta). (t0 >= GST is the rigid
-\* start condition, carried as a constant.)
+\* The WF1 region: m is sent, not yet received by c, its timestamp is <= t0,
+\* and the clock sits in the post-GST window [GST, t0+Delta]. (t0 >= GST is
+\* the rigid start condition, carried as a constant.)
 DelivPending(c, m, t0) ==
   /\ m \in sent
   /\ m \notin rcvd[c]
   /\ sentTime[m] <= t0
   /\ t0 >= GST
   /\ now >= GST
-  /\ now < t0 + Delta
+  /\ now <= t0 + Delta
 DelivDone(c, m, t0) ==
   /\ m \in rcvd[c]
-  /\ now < t0 + Delta
+  /\ now <= t0 + Delta
 
 \* Deliver(c) is enabled while m is pending: m is available (sent, unreceived,
 \* and now >= sentTime[m] by SentTimeLeNow), so Available(c) # {}, and delivering
@@ -1122,8 +1133,8 @@ LEMMA DeliverDelivers ==
 BY DEFS Available, DelivDone, Deliver, DelivPending, sent, SentTimeLeNow, TypeOK
 
 \* The stability leg: every step from the pending region either keeps it
-\* pending or reaches DelivDone. The clock bound now' < t0+Delta is preserved,
-\* because the delivery-deadline gate of Tick forbids reaching
+\* pending or reaches DelivDone. The clock bound now' <= t0+Delta is
+\* preserved, because the delivery-deadline gate of Tick forbids passing
 \* DeliveryDeadline(m) <= t0+Delta while <c,m> is pending. A step that is not
 \* a Tick leaves `now` fixed, by NowStaysUnlessTick. Timestamps stay at or
 \* below t0, by SentTimeFrozenPred, and `sent` only grows.
@@ -1133,7 +1144,7 @@ LEMMA DeliverStability ==
   PROVE  DelivPending(c, m, t0)' \/ DelivDone(c, m, t0)'
 <1> USE DEF DelivPending, DelivDone
 <1>a. m \in sent /\ m \notin rcvd[c] /\ sentTime[m] <= t0 /\ t0 >= GST
-       /\ now >= GST /\ now < t0 + Delta
+       /\ now >= GST /\ now <= t0 + Delta
   OBVIOUS
 <1>b. m \in sent'
   BY <1>a, SentMonotoneStep
@@ -1142,11 +1153,11 @@ LEMMA DeliverStability ==
 <1>e. now \in Nat /\ now' \in Nat /\ now <= now' /\ GST \in Nat /\ Delta \in Nat
        /\ sentTime[m] \in Nat
   BY <1>a, NowShape, NowMonotoneStep, GSTType, DeltaType DEF TypeOK, sent, OFF
-<1>f. now' < t0 + Delta
+<1>f. now' <= t0 + Delta
   <2>1. CASE Tick
     <3>1. <<c, m>> \in PendingDeliveries
       BY <1>a DEF PendingDeliveries
-    <3>2. now + 1 < DeliveryDeadline(m)
+    <3>2. now < DeliveryDeadline(m)
       BY <2>1, <3>1 DEF Tick
     <3>3. DeliveryDeadline(m) \in Nat /\ DeliveryDeadline(m) <= t0 + Delta
       BY <1>a, <1>e DEF DeliveryDeadline
@@ -1218,10 +1229,10 @@ LEMMA BoxStabLeg ==
 
 \* (TEMPORAL) The reusable bounded-delivery leads-to, which is Route B. After
 \* GST, a message that is already in `sent` and pending for the correct
-\* process c is received before Delta. Deliver(c) is WF-fair, and it absorbs
-\* ALL the messages that are currently available. Tick cannot reach the
+\* process c is received by t0 + Delta. Deliver(c) is WF-fair, and it absorbs
+\* ALL the messages that are currently available. Tick cannot pass the
 \* DeliveryDeadline of the message, which is at most t0 + Delta after GST,
-\* because sentTime[m] <= t0. c therefore receives m before t0 + Delta. The
+\* because sentTime[m] <= t0. c therefore receives m by t0 + Delta. The
 \* bound on now, with the rigid start t0, is the bounded-response form that
 \* the later stages use. The proof is a WF1 on Deliver(c), with the legs
 \* EnabledDeliver, DeliverDelivers and DeliverStability. It is threaded
@@ -1231,10 +1242,10 @@ THEOREM DeliverWithinDelta ==
   ASSUME NEW c \in Honest, NEW m \in Message, NEW t0 \in Nat
   PROVE  Spec =>
            ( (now >= GST /\ m \in sent /\ now = t0)
-               ~> (m \in rcvd[c] /\ now < t0 + Delta) )
+               ~> (m \in rcvd[c] /\ now <= t0 + Delta) )
 <1> SUFFICES ASSUME Spec
              PROVE  (now >= GST /\ m \in sent /\ now = t0)
-                      ~> (m \in rcvd[c] /\ now < t0 + Delta)
+                      ~> (m \in rcvd[c] /\ now <= t0 + Delta)
   OBVIOUS
 <1> DEFINE Pp  == DInv /\ DelivPending(c, m, t0)
 <1> DEFINE Qq  == DelivDone(c, m, t0)
