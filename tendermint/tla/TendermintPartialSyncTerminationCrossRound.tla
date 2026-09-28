@@ -268,7 +268,7 @@ LEMMA HighLockPrecommitTimerGap ==
 \* Once the high lock evidence's delivery deadline is reached, every possible
 \* state of an undecided process below its valid round enables computation.
 LEMMA LateUpdateEnabled ==
-  ASSUME TypeOK, GossipDeadline,
+  ASSUME TypeOK, DeadlinesAhead,
          NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
          NEW T \in Int, T >= GST, Justified(rr, w, T),
          PolkaDated(rr, w, T), Valid(w), now >= T + Delta,
@@ -283,7 +283,7 @@ LEMMA LateUpdateEnabled ==
   BY <1>1, <1>2 DEF CanCompute
 
 LEMMA LockEvidenceComputable ==
-  ASSUME TypeOK, TypeOK', GossipDeadline, PrecommitBacked, PrevoteJustified,
+  ASSUME TypeOK, TypeOK', DeadlinesAhead, PrecommitBacked, PrevoteJustified,
          PrecommitRoundLeSendTime, DecidedStepOp,
          NEW x \in Honest, NEW rr \in Rounds, NEW w \in Values,
          NEW c \in Honest,
@@ -563,6 +563,10 @@ LEMMA OldCatchUpDeadline ==
     <3>1. now = sentTime'[Precommit(x, rr, w)] + Delta
       BY ONLY <1>2, <2>bound, <2>hi, <2>ty, <3>ihb,
         NatSuccessorAtCeiling
+    <3>tk. Tick
+      BY ONLY TypeOK, [Next]_vars, <1>2, TickFromClockAdvance
+    <3>da. DeadlinesAhead
+      BY <3>tk, TickGivesDeadlines
     <3>2. CanCompute(c)
       <4>r. round[c] <= rr
         BY <1>ih
@@ -573,14 +577,12 @@ LEMMA OldCatchUpDeadline ==
       <4>t. now >= sentTime[Precommit(x, rr, w)] + Delta
         BY ONLY <4>teq, <4>tty, NatLeReflexive
       <4> QED
-        BY ONLY TypeOK, TypeOK', GossipDeadline, PrecommitBacked,
+        BY ONLY TypeOK, TypeOK', <3>da, PrecommitBacked,
           PrevoteJustified, PrecommitRoundLeSendTime, DecidedStepOp,
           <1>pc, <1>high, <1>b, <4>r, <4>t,
           LockEvidenceComputable
-    <3>3. Tick
-      BY ONLY TypeOK, [Next]_vars, <1>2, TickFromClockAdvance
     <3> QED
-      BY <3>2, <3>3, Zenon DEF Tick
+      BY <3>2, <3>tk, Zenon DEF Tick
   <2> QED
     BY <2>ord, <2>lo, <2>hi
 <1> QED
