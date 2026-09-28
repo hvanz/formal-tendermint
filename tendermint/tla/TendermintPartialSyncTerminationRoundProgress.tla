@@ -1388,7 +1388,7 @@ LEMMA ClockWorkTickDrops ==
 \* ---- Tick is enabled once the frontier is empty --------------------------
 LEMMA EmptyFrontierDeadlineOk ==
   ASSUME TypeOK, SentTimeLeNow, OldPendingSet = {}, NEW pm \in PendingDeliveries
-  PROVE  now + 1 < DeliveryDeadline(pm[2])
+  PROVE  now < DeliveryDeadline(pm[2])
 BY DeltaType, GSTType DEFS DeliveryDeadline, OldPending, OldPendingSet, PendingDeliveries, sent, SentTimeLeNow, TypeOK
 
 LEMMA TickEnabledInClockRegion ==
@@ -2055,15 +2055,17 @@ THEOREM PrevoteDeadlineNotPassedInv == ASSUME Spec PROVE []PrevoteDeadlineNotPas
 <1> QED
   BY <1>1, <1>3, PTL
 
-\* ---- Item A: the Gossip property as an INVARIANT --------------------------
-\* Base's DeliverWithinDelta is a LEADS-TO, which is the wrong shape for a
-\* state-predicate argument, so the delivery bound is re-derived here as an
-\* ordinary invariant. Tick's own third conjunct IS this predicate at the
-\* post-state, so the clock can never reach a pending message's deadline.
-\* Consumed as: a post-GST message sits in EVERY correct validator's rcvd once
-\* the clock reaches sentTime + Delta.
+\* ---- Item A: the Gossip property as an INVARIANT
+\* -------------------------- Base's DeliverWithinDelta is a LEADS-TO, which
+\* is the wrong shape for a state-predicate argument, so the delivery bound
+\* is re-derived here as an ordinary invariant. Tick's own third conjunct
+\* makes it hold in the post-state, so the clock can reach a pending
+\* message's deadline, but it cannot pass it. Consumed as: a post-GST message
+\* sits in EVERY correct validator's rcvd once the clock is above sentTime +
+\* Delta. The strict form at sentTime + Delta itself is DeadlinesAhead, in
+\* the pre-state of a Tick.
 GossipDeadline ==
-  \A pm \in PendingDeliveries : now < DeliveryDeadline(pm[2])
+  \A pm \in PendingDeliveries : now <= DeliveryDeadline(pm[2])
 
 LEMMA GossipDeadlineStepL ==
   ASSUME TypeOK, [Next]_vars, GossipDeadline
@@ -2736,11 +2738,32 @@ BY PolkaBack, SentByBack DEFS B!Range, Justified, Rounds, ValuesOrNil
 \*  ---- Item A, consumed
 \*  ----------------------------------------------------- A message that is
 \*  dated at or below a T after GST has reached EVERY correct validator once
-\*  the clock is at T + Delta. Its DeliveryDeadline is at most T + Delta.
-\*  GossipDeadline keeps the clock strictly below the deadline of anything
-\*  that is still pending. This is the one place the >= GST guard is spent.
+\*  the clock is above T + Delta. Its DeliveryDeadline is at most T + Delta,
+\*  and GossipDeadline keeps the clock at or below the deadline of anything
+\*  that is still pending. DeliveredAtTick is the form at T + Delta itself.
+\*  These two lemmas are the places where the >= GST guard is spent.
 LEMMA DeliveredByDeadline ==
   ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW m \in Message, m \in sent,
+         NEW T \in Int, T >= GST, sentTime[m] <= T, now > T + Delta
+  PROVE  m \in rcvd[c]
+<1> SUFFICES ASSUME m \notin rcvd[c] PROVE FALSE
+  OBVIOUS
+<1>ty. sentTime[m] \in Int /\ now \in Nat /\ Delta \in Nat /\ GST \in Nat
+  BY DeltaType, GSTType DEFS OFF, sent, TypeOK
+<1>1. << c, m >> \in PendingDeliveries
+  BY DEF PendingDeliveries
+<1>2. now <= DeliveryDeadline(m)
+  BY <1>1 DEF GossipDeadline
+<1>3. DeliveryDeadline(m) <= T + Delta /\ DeliveryDeadline(m) \in Int
+  BY <1>ty DEF DeliveryDeadline
+<1> QED
+  BY <1>ty, <1>2, <1>3
+
+\*  The same delivery in the pre-state of a Tick. DeadlinesAhead is strict,
+\*  so a message dated at or below T is delivered when the clock is at
+\*  T + Delta. Every maximal-progress ceiling reads this form.
+LEMMA DeliveredAtTick ==
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW m \in Message, m \in sent,
          NEW T \in Int, T >= GST, sentTime[m] <= T, now >= T + Delta
   PROVE  m \in rcvd[c]
 <1> SUFFICES ASSUME m \notin rcvd[c] PROVE FALSE
@@ -2750,7 +2773,7 @@ LEMMA DeliveredByDeadline ==
 <1>1. << c, m >> \in PendingDeliveries
   BY DEF PendingDeliveries
 <1>2. now < DeliveryDeadline(m)
-  BY <1>1 DEF GossipDeadline
+  BY <1>1 DEF DeadlinesAhead
 <1>3. DeliveryDeadline(m) <= T + Delta /\ DeliveryDeadline(m) \in Int
   BY <1>ty DEF DeliveryDeadline
 <1> QED
@@ -3160,39 +3183,40 @@ THEOREM PrecommitBackedInv == ASSUME Spec PROVE []PrecommitBacked
 
 \*  ---- Item F, the maximal-progress ceiling
 \*  ---------------------------------- Delivered dated evidence at round rr
-\*  pins the clock. Every state that a correct validator could still be in, at
-\*  or below rr, leaves it a computation step. Tick is gated on the absence of
-\*  any such step. The four enabling lemmas below are the four states to rule
-\*  out, one CanCompute disjunct each.
+\*  pins the clock. Every state that a correct validator could still be in,
+\*  at or below rr, leaves it a computation step. Tick is gated on the
+\*  absence of any such step. The four enabling lemmas below are the four
+\*  states to rule out, one CanCompute disjunct each. They read
+\*  DeadlinesAhead, so they hold in the pre-state of a Tick at T + Delta.
 
 LEMMA ByzNonEmpty == ASSUME NEW Q \in ByzQuorum PROVE \E s : s \in Q
 BY ByzHasHonest
 
 \* Every member of a dated any-value quorum has reached c's view.
 LEMMA QuorumDeliveredSenders ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds, NEW T \in Int,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds, NEW T \in Int,
          T >= GST, AnyPrevoteDated(rr, T), now >= T + Delta
   PROVE  \E Q \in ByzQuorum : Q \subseteq RSendersOfTypeAtRound(c, "Prevote", rr)
-BY DeliveredByDeadline, PrevoteInMessage DEFS AnyPrevoteDated, Prevote, RSendersOfTypeAtRound
+BY DeliveredAtTick, PrevoteInMessage DEFS AnyPrevoteDated, Prevote, RSendersOfTypeAtRound
 
 \* Same for a dated polka, in the shape the value guards read.
 LEMMA PolkaDeliveredSenders ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds,
          NEW vv \in ValuesOrNil, NEW T \in Int, T >= GST, PolkaDated(rr, vv, T),
          now >= T + Delta
   PROVE  RExistsPrevoteQuorum(c, vv, rr)
-BY DeliveredByDeadline, PrevoteInMessage DEFS PolkaDated, Prevote, RExistsPrevoteQuorum, RPrevotes, RPrevoteSendersFor
+BY DeliveredAtTick, PrevoteInMessage DEFS PolkaDated, Prevote, RExistsPrevoteQuorum, RPrevotes, RPrevoteSendersFor
 
 \* The justification, delivered, in the shape the propose-step guards read.
 LEMMA JustifiedDelivered ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
          NEW T \in Int, T >= GST, Justified(rr, w, T), now >= T + Delta
   PROVE  \E prop \in RProposalsFromProposerAt(c, rr) :
            /\ prop.value = w
            /\ \/ prop.validRound = -1
               \/ /\ prop.validRound \in B!Range(0, rr)
                  /\ RExistsPrevoteQuorum(c, w, prop.validRound)
-BY DeliveredByDeadline, PolkaDeliveredSenders
+BY DeliveredAtTick, PolkaDeliveredSenders
 DEFS B!Range, Justified, Rounds, RProposals, RProposalsFromProposerAt, ValuesOrNil
 
 \* Maximal progress, as the one-line contradiction every clause below closes on.
@@ -3202,7 +3226,7 @@ BY DEF Tick
 \* (1) c cannot lag BELOW rr: the delivered quorum is f+1 senders at rr, so
 \* SkipRound(c, rr) is enabled (thirteenth disjunct).
 LEMMA SkipEnabledFromQuorum ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds, NEW T \in Int,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds, NEW T \in Int,
          T >= GST, AnyPrevoteDated(rr, T), now >= T + Delta,
          step[c] # "decided", round[c] < rr
   PROVE  CanCompute(c)
@@ -3211,7 +3235,7 @@ BY ByzIsWeak, QuorumDeliveredSenders DEFS CanCompute, RSendersOfAnyMessageAt
 \* (2) c cannot sit at rr in step "prevote" with the prevote timer OFF:
 \* ScheduleTimeoutPrevote(c) is enabled (fifth disjunct).
 LEMMA ArmEnabledFromQuorum ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds, NEW T \in Int,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds, NEW T \in Int,
          T >= GST, AnyPrevoteDated(rr, T), now >= T + Delta,
          round[c] = rr, step[c] = "prevote", timer[c]["prevote"] = OFF
   PROVE  CanCompute(c)
@@ -3220,7 +3244,7 @@ BY QuorumDeliveredSenders DEFS CanCompute, RExistsAnyPrevoteQuorum
 \* (3) c cannot sit at rr in step "propose": the delivered justification fires
 \* the third disjunct (fresh proposal) or the fourth (proof of lock).
 LEMMA ProposeExitEnabled ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
          NEW T \in Int, T >= GST, Justified(rr, w, T), now >= T + Delta,
          round[c] = rr, step[c] = "propose"
   PROVE  CanCompute(c)
@@ -3229,7 +3253,7 @@ BY JustifiedDelivered, RangeCo DEF CanCompute
 \* (4) c cannot sit at rr in step "prevote" with the full value evidence: the
 \* sixth disjunct fires, which is the value precommit itself.
 LEMMA ValuePrecommitEnabled ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW rr \in Rounds, NEW w \in Values,
          NEW T \in Int, T >= GST, Justified(rr, w, T), PolkaDated(rr, w, T), Valid(w),
          now >= T + Delta, round[c] = rr, step[c] = "prevote"
   PROVE  CanCompute(c)
@@ -3277,7 +3301,7 @@ LEMMA LockWindowCoreStepL ==
                           /\ PolkaDated(rr, w, T)' => now' <= T + Delta)
   BY DEF LockWindowCore
 <1>ty. /\ now \in Nat /\ now' \in Nat /\ T \in Nat /\ GST \in Nat
-       /\ Delta \in Nat /\ Delta > 1
+       /\ Delta \in Nat /\ Delta > 0
        /\ round[c] \in Nat /\ round'[c] \in Nat
        /\ timer[c]["prevote"] \in Int /\ timer'[c]["prevote"] \in Int
        /\ TimeoutPrevote(rr) \in Nat
@@ -3305,23 +3329,27 @@ LEMMA LockWindowCoreStepL ==
   <2>5. round[c] = rr /\ step[c] = "prevote" /\ Valid(w) /\ PolkaDated(rr, w, T)
           => now <= T + Delta
     BY <2>ev DEF LockWindowCore
+  \*  A step that advances the clock is a Tick, and the deadline conjunct of
+  \*  Tick holds in its pre-state.
+  <2>tg. now' = now + 1 => DeadlinesAhead
+    BY <1>ty, NowStaysUnlessTick, TickGivesDeadlines
   \*  CLAUSE 1. Round below rr. Rounds only grow, and "decided" is absorbing,
   \*  so the hypothesis held before the step. A Tick at the deadline would
   \*  find SkipRound enabled.
   <2>c1. step'[c] # "decided" /\ round'[c] < rr => now' <= T + Delta
-    BY <1>n, <1>ty, <2>1, <2>ev, DecidedStays, NowStaysUnlessTick, RoundGrowsStep, SkipEnabledFromQuorum, TickNeedsQuiet
+    BY <2>tg, <1>n, <1>ty, <2>1, <2>ev, DecidedStays, NowStaysUnlessTick, RoundGrowsStep, SkipEnabledFromQuorum, TickNeedsQuiet
     DEFS Rounds, TypeOK
   <2>c2. round'[c] = rr /\ step'[c] = "propose" => now' <= T + Delta
-    BY <1>n, <1>ty, <2>1, <2>2, <2>ev, NowStaysUnlessTick, ProposeEntryFrame, ProposeExitEnabled, TickNeedsQuiet
+    BY <2>tg, <1>n, <1>ty, <2>1, <2>2, <2>ev, NowStaysUnlessTick, ProposeEntryFrame, ProposeExitEnabled, TickNeedsQuiet
   <2>c3. round'[c] = rr /\ step'[c] = "prevote" /\ timer'[c]["prevote"] = OFF
            => now' <= T + Delta
-    BY <1>n, <1>ty, <2>2, <2>3, <2>ev, ArmEnabledFromQuorum, NowStaysUnlessTick, PrevoteStepFrame, PrevoteTimerWriteFrame, TickNeedsQuiet
+    BY <2>tg, <1>n, <1>ty, <2>2, <2>3, <2>ev, ArmEnabledFromQuorum, NowStaysUnlessTick, PrevoteStepFrame, PrevoteTimerWriteFrame, TickNeedsQuiet
   <2>c4. round'[c] = rr /\ step'[c] = "prevote" /\ timer'[c]["prevote"] # OFF
            => timer'[c]["prevote"] <= T + Delta + TimeoutPrevote(rr)
     BY <1>ty, <2>3, <2>4, PrevoteStepFrame, PrevoteTimerWriteFrame DEF ProposeStepPrevoteOff
   <2>c5. round'[c] = rr /\ step'[c] = "prevote" /\ Valid(w) /\ PolkaDated(rr, w, T)'
            => now' <= T + Delta
-    BY <1>B, <1>n, <1>ty, <2>2, <2>5, <2>ev, NowStaysUnlessTick, PolkaBack, PrevoteStepFrame, TickNeedsQuiet, ValuePrecommitEnabled
+    BY <2>tg, <1>B, <1>n, <1>ty, <2>2, <2>5, <2>ev, NowStaysUnlessTick, PolkaBack, PrevoteStepFrame, TickNeedsQuiet, ValuePrecommitEnabled
     DEF ValuesOrNil
   <2> QED
     BY <2>c1, <2>c2, <2>c3, <2>c4, <2>c5
