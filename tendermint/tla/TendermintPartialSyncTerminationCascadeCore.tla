@@ -22,7 +22,8 @@ EXTENDS TendermintPartialSyncTerminationCascadeRegion
 (*                                                                         *)
 (*  No correct validator sits at r in step "propose" after the cascade     *)
 (*  deadline. ProposalDated puts the round-r proposal in the pool at or    *)
-(*  below the ceiling. GossipDeadline delivers it one Delta later.         *)
+(*  below the ceiling. A Tick one Delta later finds it delivered           *)
+(*  (DeadlinesAhead).                                                      *)
 (*  ProposeExitEnabled then reports a computation step for the validator.  *)
 (*  The maximal progress guard of Tick forbids a tick while a computation  *)
 (*  step exists, so the clock stops at the deadline.                       *)
@@ -48,7 +49,7 @@ DEFS OnPrecommitQuorumValue, OnPrevoteQuorumNil, OnPrevoteQuorumValueFirstTime, 
 \* everything its call site needs, so the call site never searches.
 LEMMA DeadlineAboveCeiling ==
   ASSUME NEW e \in Nat, NEW d \in Nat, NEW n \in Nat,
-         NEW g \in Nat, d > 1, e >= g, n >= e + 2 * d
+         NEW g \in Nat, d > 0, e >= g, n >= e + 2 * d
   PROVE  /\ e + d \in Nat
          /\ e + d >= g
          /\ n > e + d
@@ -57,7 +58,7 @@ BY SMT
 
 LEMMA ClockLeFreshDeadline ==
   ASSUME NEW n \in Nat, NEW np \in Int, NEW d \in Nat,
-         d > 1, np = n \/ np = n + 1
+         d > 0, np = n \/ np = n + 1
   PROVE  np <= n + 2 * d
 BY SMT
 
@@ -83,15 +84,29 @@ BY SMT
 
 \* ---- The state content at the deadline ------------------------------------
 LEMMA ProposeExitAtDeadline ==
-  ASSUME TypeOK, GossipDeadline, ProposalDated, ProposalJustified,
+  ASSUME TypeOK, DeadlinesAhead, ProposalDated, ProposalJustified,
          NEW p \in Honest, NEW r \in Rounds, NEW c \in Honest,
          RoundOrigin(p, r), Proposer[r] \in Honest,
          TimeoutPropose(r) > 2 * Delta, ~ SomeCorrectDecided,
          now >= CascadeDeadline(p, r),
          round[c] = r, step[c] = "propose"
   PROVE  CanCompute(c)
-BY DeadlineAboveCeiling, DeltaType, GSTType, ProposeExitEnabled, RoundTypes
-DEFS CascadeCeiling, CascadeDeadline, OFF, ProposalDated, ProposalJustified, RoundOrigin, TypeOK
+<1>ty. /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] >= GST
+       /\ Delta \in Nat /\ Delta > 0 /\ now \in Nat /\ GST \in Nat
+  BY DeltaType, GSTType DEFS OFF, RoundOrigin, TypeOK
+<1>a. /\ CascadeCeiling(p, r) \in Nat
+      /\ CascadeCeiling(p, r) >= GST
+      /\ now > CascadeCeiling(p, r)
+      /\ now >= CascadeCeiling(p, r) + Delta
+  BY <1>ty, DeadlineAboveCeiling DEFS CascadeCeiling, CascadeDeadline
+<1>b. PICK v \in Values, vr \in Rounds \cup {-1} :
+        /\ Proposal(Proposer[r], r, v, vr) \in sent
+        /\ sentTime[Proposal(Proposer[r], r, v, vr)] <= CascadeCeiling(p, r)
+  BY <1>a DEF ProposalDated
+<1>c. Justified(r, v, CascadeCeiling(p, r))
+  BY <1>a, <1>b DEF ProposalJustified
+<1> QED
+  BY <1>a, <1>c, ProposeExitEnabled
 
 -----------------------------------------------------------------------------
 ProposeExitByDeadline ==
@@ -125,7 +140,7 @@ LEMMA ProposeExitByDeadlineStepL ==
   <2> QED
     BY <2>1 DEFS DecidedStepOp, HasDecided, SomeCorrectDecided
 <1>r0. /\ r \in Nat /\ r > 0 /\ r - 1 \in Rounds
-       /\ Delta \in Nat /\ Delta > 1 /\ GST \in Nat
+       /\ Delta \in Nat /\ Delta > 0 /\ GST \in Nat
        /\ TimeoutPrecommit(r - 1) \in Nat /\ TimeoutPrecommit(r - 1) > 0
        /\ now \in Nat /\ now' \in Nat /\ round[c] \in Nat
   <2>1. r \in Nat /\ r > 0
@@ -185,6 +200,8 @@ LEMMA ProposeExitByDeadlineStepL ==
     <3>3. CASE now' = now + 1
       <4>q. ~ \E x \in Honest : CanCompute(x)
         BY <3>3, TickFromClockStep DEF Tick
+      <4>da. DeadlinesAhead
+        BY <3>3, TickFromClockStep, TickGivesDeadlines
       <4>ne. now # CascadeDeadline(p, r)
         <5> SUFFICES ASSUME now = CascadeDeadline(p, r)
                      PROVE  FALSE
@@ -192,7 +209,7 @@ LEMMA ProposeExitByDeadlineStepL ==
         <5>1. now >= CascadeDeadline(p, r)
           BY <1>r0, <2>dt, GeFromEq
         <5>2. CanCompute(c)
-          BY <1>nd, <2>1, <2>ro, <3>st, <5>1, ProposeExitAtDeadline
+          BY <1>nd, <2>1, <2>ro, <3>st, <4>da, <5>1, ProposeExitAtDeadline
         <5> QED
           BY <4>q, <5>2
       <4>1. now + 1 <= CascadeDeadline(p, r)
@@ -424,7 +441,7 @@ LEMMA NilPrevoteInWindowStepL ==
   BY DecidedLatchStep
 <1>m. Prevote(c, r, nil) \in Message
   BY HonestSubValidators, MsgPrevote DEF ValuesOrNil
-<1>r0. /\ r \in Nat /\ r > 0 /\ Delta \in Nat /\ Delta > 1
+<1>r0. /\ r \in Nat /\ r > 0 /\ Delta \in Nat /\ Delta > 0
        /\ TimeoutPrecommit(r - 1) \in Nat
        /\ now \in Nat /\ now' \in Nat
   <2>1. r \in Nat /\ r > 0
@@ -843,7 +860,7 @@ BY SMT
 \* The step from one gossip delay to two, for the composed reading below.
 LEMMA DeltaStepOrder ==
   ASSUME NEW t \in Nat, NEW d \in Nat, NEW g \in Nat, NEW n \in Nat,
-         d > 1, t >= g, n > t + 2 * d
+         d > 0, t >= g, n > t + 2 * d
   PROVE  /\ t + d \in Nat
          /\ t + d >= g
          /\ n > t + d
@@ -855,7 +872,7 @@ BY SMT
 LEMMA AboveAnchorOrder ==
   ASSUME NEW n \in Nat, NEW k \in Nat, NEW e \in Nat, NEW g \in Nat,
          NEW d \in Nat, NEW s \in Int, NEW eh \in Int,
-         d > 1, k > 2 * d, s <= n - k, s >= eh, eh >= e, e > g
+         d > 0, k > 2 * d, s <= n - k, s >= eh, eh >= e, e > g
   PROVE  /\ n - k \in Nat
          /\ n - k >= g
          /\ n > (n - k) + d
@@ -966,7 +983,7 @@ LEMMA AboveGivesEscape ==
   OBVIOUS
 <1>q. Proposer[r] \in Honest /\ TimeoutPropose(r) > 2 * Delta
   BY DEF WRDurable
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
        /\ TimeoutPrecommit(r) \in Nat /\ TimeoutPrecommit(r) > 2 * Delta
   <2>1. TimeoutPrecommit(r) \in Nat
@@ -1070,7 +1087,7 @@ LEMMA ProposalFromCorrectPrevote ==
            Proposal(Proposer[r], r, v2, vr2) \in sent
 <1>m. Prevote(y, r, w) \in Message
   BY HonestSubValidators, MsgPrevote
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
        /\ TimeoutPropose(r) \in Nat
        /\ TimeoutPropose(r) > 2 * Delta
@@ -1211,7 +1228,7 @@ LEMMA ArmingQuorumGivesEscape ==
     BY <2>1 DEF ValuesOrNil
 <1>2. w = v
   BY <1>1, <1>q, PrevoteValueIsProposed
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
        /\ TimeoutPrevote(r) \in Nat
        /\ TimeoutPrevote(r) > 2 * Delta
@@ -1287,16 +1304,18 @@ LEMMA NilPrecommitGivesEscape ==
   BY <1>1, <1>2, <1>3
 
 -----------------------------------------------------------------------------
-\* The two Tick cases. A Tick freezes the pool, and its maximal-progress guard
-\* says that no correct validator can compute, so both lemmas run entirely in
-\* the pre-state. Their conclusions name sent and sentTime only, so the step
-\* lemma carries them across the Tick by monotonicity alone.
-
+\* The two Tick cases. A Tick freezes the pool, and its maximal-progress
+\* guard says that no correct validator can compute, and its deadline
+\* conjunct says that no message is pending at its deadline, so both lemmas
+\* run entirely in the pre-state. Their conclusions name sent and sentTime
+\* only, so the step lemma carries them across the Tick by monotonicity
+\* alone.
+\*
 \* Clause P at the one instant the clock can break it. Five positions of a
 \* correct validator, and each one gives the prevote, gives the escape, or
 \* contradicts the quiet clock.
 LEMMA PrevoteAtQuietClock ==
-  ASSUME TypeOK, SentTimeLeNow, RcvdSubsetSent, GossipDeadline, EntryWindowCore,
+  ASSUME TypeOK, SentTimeLeNow, RcvdSubsetSent, DeadlinesAhead, EntryWindowCore,
          CrossingBacked, EnteredAtLeNow, EnteredCurrentRound, PrecommitBacked,
          PrevoteJustified, PrevoteOncePerRound, HonestProposalUnique,
          NilPrevoteInWindow, RoundVoteAfterEntry, StepPastProposeHasPrevote,
@@ -1321,7 +1340,7 @@ LEMMA PrevoteAtQuietClock ==
   OBVIOUS
 <1>prop. PICK vr \in Rounds \cup {-1} : Proposal(Proposer[r], r, v, vr) \in sent
   BY JustifiedGivesProposal
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ round[c] \in Nat /\ r \in Nat /\ T \in Nat
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
        /\ TimeoutPrecommit(r - 1) \in Nat /\ r > 0
@@ -1384,7 +1403,7 @@ LEMMA PrevoteAtQuietClock ==
 \* own justification and its own any-value quorum, so the validator below r is
 \* excluded by SkipRound instead of by the ceiling.
 LEMMA PrecommitAtQuietClock ==
-  ASSUME TypeOK, SentTimeLeNow, RcvdSubsetSent, GossipDeadline, EnteredAtLeNow,
+  ASSUME TypeOK, SentTimeLeNow, RcvdSubsetSent, DeadlinesAhead, EnteredAtLeNow,
          EnteredCurrentRound, CrossingBacked, PrecommitBacked, PrevoteJustified,
          PrevoteOncePerRound, HonestProposalUnique, NilPrevoteInWindow,
          RoundVoteAfterEntry, StepPrecommitHasPrecommit, DecidedStepOp,
@@ -1402,7 +1421,7 @@ LEMMA PrecommitAtQuietClock ==
   BY DEF CascadeEscape
 <1>nc. ~ CanCompute(c)
   OBVIOUS
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ round[c] \in Nat /\ r \in Nat /\ T \in Nat
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST
   BY DeltaType, GSTType DEFS OFF, Rounds, RoundOrigin, TypeOK
@@ -1489,7 +1508,7 @@ LEMMA Lemma5HypGivesCascadeCore ==
   BY DEFS Lemma5Hyp, Lemma5Timeouts
 <1>now. now = enteredAt[p][r]
   BY DEFS FirstToEnter, Lemma5Hyp
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ enteredAt[p][r] \in Nat
        /\ TimeoutPrevote(r) \in Nat /\ TimeoutPrevote(r) > 0
   <2>1. TimeoutPrevote(r) \in Nat /\ TimeoutPrevote(r) > 0
@@ -1649,7 +1668,7 @@ LEMMA CascadeCoreStepL ==
 <1>n. now' = now \/ now' = now + 1
   BY NowShape
 <1>ty. /\ now \in Nat /\ now' \in Nat /\ GST \in Nat
-       /\ Delta \in Nat /\ Delta > 1 /\ T \in Nat
+       /\ Delta \in Nat /\ Delta > 0 /\ T \in Nat
   BY <1>n, DeltaType, GSTType DEFS TypeOK
 \* The conclusion of clause P, carried across one step.
 <1>trP. ASSUME Prevote(c, r, v) \in sent,
@@ -1690,8 +1709,10 @@ LEMMA CascadeCoreStepL ==
       BY <3>1, TickFromClockStep
     <3>3. ~ \E x \in Honest : CanCompute(x)
       BY <3>2 DEF Tick
+    <3>da. DeadlinesAhead
+      BY <3>2, TickGivesDeadlines
     <3> QED
-      BY <1>P, <2>3, <2>h, <2>ju, <2>ne, <3>3, PrevoteAtQuietClock
+      BY <1>P, <2>3, <2>h, <2>ju, <2>ne, <3>3, <3>da, PrevoteAtQuietClock
   <2> QED
     BY <1>ty, <2>gt, <2>2, <2>3
 \* ---- CLAUSE N ----------------------------------------------------------
@@ -1815,8 +1836,10 @@ LEMMA CascadeCoreStepL ==
       BY <3>1, TickFromClockStep
     <3>3. ~ \E x \in Honest : CanCompute(x)
       BY <3>2 DEF Tick
+    <3>da. DeadlinesAhead
+      BY <3>2, TickGivesDeadlines
     <3> QED
-      BY <1>Q, <2>3, <2>pk, <2>ne, <3>3, PrecommitAtQuietClock
+      BY <1>Q, <2>3, <2>pk, <2>ne, <3>3, <3>da, PrecommitAtQuietClock
   <2> QED
     BY <1>ty, <2>gt, <2>2, <2>3
 <1> QED
