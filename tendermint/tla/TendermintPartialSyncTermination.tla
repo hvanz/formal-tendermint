@@ -912,7 +912,7 @@ THEOREM GoodRoundFromDominator ==
   ASSUME Spec, ProgressBeyond, []~SomeCorrectDecided, ProposerRecurrence,
          TimeoutsSufficientBeyond, NEW d \in Honest, <>[]EntryDominator(d)
   PROVE  []<>GoodRoundExists
-<1>c. Delta \in Nat /\ Delta > 1 /\ GST \in Nat
+<1>c. Delta \in Nat /\ Delta > 0 /\ GST \in Nat
   BY DeltaType, GSTType
 <1>to. \A rr \in Rounds : rr >= 2 * Delta => Lemma5Timeouts(rr)
   BY DEF TimeoutsSufficientBeyond

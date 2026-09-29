@@ -436,7 +436,7 @@ THEOREM QuorumReached ==
 \* delay, so the guard was within one instant of holding before the step.
 LEMMA GuardBack ==
   ASSUME NEW n \in Nat, NEW np \in Int, NEW t \in Nat, NEW d \in Nat,
-         d > 1, np <= n + 1, np > t + d
+         d > 0, np <= n + 1, np > t + d
   PROVE  /\ n >= t + d
          /\ n > t
 BY SMT
@@ -446,17 +446,18 @@ BY SMT
 \* vote.
 LEMMA BackingBelowEntry ==
   ASSUME NEW t \in Nat, NEW s2 \in Int, NEW tt \in Nat, NEW d \in Nat,
-         NEW tv \in Int, d > 1, tv > 2 * d, s2 >= tt, s2 <= t - tv, t <= tt + d
+         NEW tv \in Int, d > 0, tv > 2 * d, s2 >= tt, s2 <= t - tv, t <= tt + d
   PROVE  FALSE
 BY SMT
 
 \* An armed prevote timer at r is due more than two gossip delays above the
 \* entry. Clause 5 of LockWindowCore stops the clock one gossip delay above
-\* it. The two readings cannot both hold.
+\* it. The two readings cannot both hold. The lemma needs no bound on d
+\* other than d \in Nat. With a premise d > 0, the SMT backend fails on it.
 LEMMA TimerAboveWindow ==
   ASSUME NEW n \in Nat, NEW tt \in Nat, NEW d \in Nat, NEW tm \in Int,
          NEW q2 \in Int, NEW tv \in Int,
-         d > 1, tv > 2 * d, q2 >= tt, tm = q2 + tv, n >= tm, n <= tt + d
+         tv > 2 * d, q2 >= tt, tm = q2 + tv, n >= tm, n <= tt + d
   PROVE  FALSE
 BY SMT
 
@@ -465,7 +466,7 @@ BY SMT
 \* deadline.
 LEMMA DepartureAboveWindow ==
   ASSUME NEW n \in Nat, NEW tt \in Nat, NEW d \in Nat, NEW k \in Nat,
-         NEW s2 \in Int, d > 1, k > 2 * d, s2 >= tt, s2 <= n - k
+         NEW s2 \in Int, d > 0, k > 2 * d, s2 >= tt, s2 <= n - k
   PROVE  n > tt + d
 BY SMT
 
@@ -586,7 +587,7 @@ LEMMA EarlyPolkaNoNilStepL ==
   BY DecidedLatchStep
 <1>r0. r > 0
   BY DEF RoundOrigin
-<1>ty. /\ now \in Nat /\ now' \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ now' \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ GST \in Nat /\ r \in Nat /\ T \in Nat
        /\ TimeoutPrecommit(r - 1) \in Nat
        /\ TimeoutPrevote(r) \in Int /\ TimeoutPrevote(r) > 2 * Delta
@@ -745,8 +746,15 @@ LEMMA EarlyPolkaNoNilStepL ==
 \* The window bound reads at the entry, and the polka sits at or below it.
       <4>8. now <= enteredAt[p][r] + Delta
         BY <1>ty, <2>le, <2>ty, <4>2
+\* The facts of TimerAboveWindow, one for each premise. The QED names only
+\* these facts. With the full context, the SMT backend failed on it.
+      <4>a. /\ now \in Nat /\ Delta \in Nat
+            /\ TimeoutPrevote(r) \in Int /\ TimeoutPrevote(r) > 2 * Delta
+        BY <1>ty
+      <4>b. timer[c]["prevote"] - TimeoutPrevote(r) >= enteredAt[p][r]
+        BY <2>ty, <4>5, <4>6, <4>a, <4>ty
       <4> QED
-        BY <1>ty, <2>ty, <4>1, <4>5, <4>6, <4>7, <4>8, <4>ty, TimerAboveWindow
+        BY ONLY <2>ty, <4>1, <4>7, <4>8, <4>a, <4>b, <4>ty, TimerAboveWindow
     <3> QED
       BY <3>1, <3>2, <3>3, <3>4
   <2> QED
@@ -849,7 +857,7 @@ LEMMA EarlyPolkaAboveStepL ==
   BY DecidedLatchStep
 <1>r0. r > 0
   BY DEF RoundOrigin
-<1>ty. /\ now \in Nat /\ now' \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ now' \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ GST \in Nat /\ r \in Nat /\ T \in Nat /\ round[c] \in Nat
        /\ TimeoutPrecommit(r) \in Nat /\ TimeoutPrecommit(r) > 2 * Delta
   <2>1. TimeoutPrecommit(r) \in Nat
@@ -993,7 +1001,7 @@ LEMMA EarlyPolkaGivesQuorum ==
          Justified(r, v, T), now > enteredAt[p][r] + Delta,
          ~ SomeCorrectDecided
   PROVE  DecideEvidence(r)
-<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 1
+<1>ty. /\ now \in Nat /\ GST \in Nat /\ Delta \in Nat /\ Delta > 0
        /\ enteredAt[p][r] \in Nat /\ enteredAt[p][r] > GST /\ r \in Nat
   BY DeltaType, GSTType DEFS OFF, RoundOrigin, Rounds, TypeOK
 <1>any. AnyPrevoteDated(r, T)
