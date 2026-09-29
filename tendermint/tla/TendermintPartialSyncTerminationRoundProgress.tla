@@ -3512,7 +3512,15 @@ LEMMA LateLockDeliveryStepL ==
           /\ sentTime[Precommit(x, lr, v)] >= GST
       BY <3>3, <3>4 DEFS OFF, sent, TypeOK
     <3>bx. Backing(lr, v, sentTime[Precommit(x, lr, v)])
-      BY <3>4, <3>S DEF PrecommitBacked
+      \*  PrecommitBacked at x, lr, v and t = the send time of the precommit.
+      <4>1. \A t \in Nat :
+              (Precommit(x, lr, v) \in sent /\ sentTime[Precommit(x, lr, v)] <= t)
+                => Backing(lr, v, t)
+        BY DEF PrecommitBacked
+      <4>2. sentTime[Precommit(x, lr, v)] <= sentTime[Precommit(x, lr, v)]
+        BY <3>S
+      <4> QED
+        BY <3>4, <3>S, <4>1, <4>2
     <3>b. CASE /\ v \in Values
                /\ Valid(v)
                /\ PolkaDated(lr, v, sentTime[Precommit(x, lr, v)])
