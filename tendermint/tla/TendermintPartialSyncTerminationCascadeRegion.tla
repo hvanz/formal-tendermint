@@ -124,7 +124,7 @@ BY SMT
 \* ceiling, not even after one tick.
 LEMMA ClockBelowFreshEntry ==
   ASSUME NEW n \in Nat, NEW np \in Int, NEW d \in Int,
-         d > 1, np = n \/ np = n + 1, np > n + d
+         d > 0, np = n \/ np = n + 1, np > n + d
   PROVE  FALSE
 BY SMT
 
@@ -432,7 +432,7 @@ LEMMA ProposalDatedStepL ==
                               <= CascadeCeiling(p, r)'
   BY DEF ProposalDated
 <1>r0. /\ r \in Nat /\ r > 0 /\ r - 1 \in Nat
-       /\ Delta \in Nat /\ Delta > 1
+       /\ Delta \in Nat /\ Delta > 0
        /\ TimeoutPrecommit(r - 1) > 0 /\ TimeoutPrecommit(r - 1) \in Int
        /\ now \in Nat /\ now' \in Nat
   <2>1. r \in Nat /\ r > 0

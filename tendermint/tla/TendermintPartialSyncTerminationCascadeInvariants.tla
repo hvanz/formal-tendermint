@@ -1253,16 +1253,16 @@ BY PrecommitInMessage, SentByBack DEF AnyPrecommitDated
 
 \* Every member of a dated any-value precommit quorum has reached c's view.
 LEMMA PrecommitQuorumDeliveredSenders ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW lr \in Rounds,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW lr \in Rounds,
          NEW T \in Int, T >= GST, AnyPrecommitDated(lr, T), now >= T + Delta
   PROVE  \E Q \in ByzQuorum : Q \subseteq RSendersOfTypeAtRound(c, "Precommit", lr)
-BY DeliveredByDeadline, PrecommitInMessage
+BY DeliveredAtTick, PrecommitInMessage
 DEFS AnyPrecommitDated, Precommit, RSendersOfTypeAtRound
 
 \* (1) c cannot lag BELOW lr: the delivered quorum is f+1 senders at lr, so
 \* SkipRound(c, lr) is enabled (thirteenth CanCompute disjunct).
 LEMMA SkipEnabledFromPrecommitQuorum ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW lr \in Rounds,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW lr \in Rounds,
          NEW T \in Int, T >= GST, AnyPrecommitDated(lr, T), now >= T + Delta,
          step[c] # "decided", round[c] < lr
   PROVE  CanCompute(c)
@@ -1272,7 +1272,7 @@ DEFS CanCompute, RSendersOfAnyMessageAt
 \* (2) c cannot sit at lr with the precommit timer OFF: the delivered quorum
 \* enables ScheduleTimeoutPrecommit(c) (tenth CanCompute disjunct).
 LEMMA ArmPrecommitEnabledFromQuorum ==
-  ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW lr \in Rounds,
+  ASSUME TypeOK, DeadlinesAhead, NEW c \in Honest, NEW lr \in Rounds,
          NEW T \in Int, T >= GST, AnyPrecommitDated(lr, T), now >= T + Delta,
          round[c] = lr, step[c] # "decided", timer[c]["precommit"] = OFF
   PROVE  CanCompute(c)
@@ -1365,7 +1365,7 @@ LEMMA EntryWindowCoreStepL ==
                                <= T + Delta + TimeoutPrecommit(lr))
   BY DEF EntryWindowCore
 <1>ty. /\ now \in Nat /\ now' \in Nat /\ T \in Nat /\ GST \in Nat
-       /\ Delta \in Nat /\ Delta > 1
+       /\ Delta \in Nat /\ Delta > 0
        /\ round[c] \in Nat /\ round'[c] \in Nat
        /\ timer[c]["precommit"] \in Int /\ timer'[c]["precommit"] \in Int
        /\ TimeoutPrecommit(lr) \in Nat
@@ -1389,11 +1389,15 @@ LEMMA EntryWindowCoreStepL ==
           /\ timer[c]["precommit"] # OFF
           => timer[c]["precommit"] <= T + Delta + TimeoutPrecommit(lr)
     BY <2>ev DEF EntryWindowCore
+  \*  A step that advances the clock is a Tick, and the deadline conjunct of
+  \*  Tick holds in its pre-state.
+  <2>tg. now' = now + 1 => DeadlinesAhead
+    BY <1>ty, NowStaysUnlessTick, TickGivesDeadlines
   \*  CLAUSE 1. Rounds only grow, and "decided" is absorbing, so the
   \*  hypothesis held before the step. A Tick at the deadline would find
   \*  SkipRound enabled.
   <2>c1. step'[c] # "decided" /\ round'[c] < lr => now' <= T + Delta
-    BY <1>n, <1>ty, <2>1, <2>ev, DecidedStays, NowStaysUnlessTick,
+    BY <2>tg, <1>n, <1>ty, <2>1, <2>ev, DecidedStays, NowStaysUnlessTick,
        RoundGrowsStep, SkipEnabledFromPrecommitQuorum, TickNeedsQuiet
     DEFS Rounds, TypeOK
   \*  CLAUSE 2. Either c was already at lr with the slot unarmed, and a Tick
@@ -1402,7 +1406,7 @@ LEMMA EntryWindowCoreStepL ==
   \*  while clause 1 bounds it.
   <2>c2. step'[c] # "decided" /\ round'[c] = lr
            /\ timer'[c]["precommit"] = OFF => now' <= T + Delta
-    BY <1>n, <1>ty, <2>1, <2>2, <2>ev, ArmPrecommitEnabledFromQuorum,
+    BY <2>tg, <1>n, <1>ty, <2>1, <2>2, <2>ev, ArmPrecommitEnabledFromQuorum,
        DecidedStays, NowStaysUnlessTick, PrecommitTimerWriteFrame,
        RoundRaiseFrame, TickNeedsQuiet
     DEFS Rounds, TypeOK
