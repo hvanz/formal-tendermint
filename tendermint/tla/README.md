@@ -190,7 +190,7 @@ Do not add them to a passing target.
 ### Measured results
 
 Times measured on 2026-08-09 with `/usr/bin/time -p`.
-Obligation counts from `make agreement termination` on 2026-09-27.
+Obligation counts from `make agreement termination` on 2026-09-29.
 Machine: MacBook Pro, Apple M4 Pro (14 cores: 10 performance, 4 efficiency), 48 GB memory, macOS 26.6.1.
 
 **Agreement**:
@@ -207,20 +207,20 @@ Machine: MacBook Pro, Apple M4 Pro (14 cores: 10 performance, 4 efficiency), 48 
 
 | Module                         | Elapsed time | Proof obligations |
 |--------------------------------|-------------:|------------------:|
-| `TerminationBase`              |      0:14:42 |             1,345 |
+| `TerminationBase`              |      0:14:42 |             1,346 |
 | `TerminationNonZeno`           |      0:17:22 |             1,244 |
-| `TerminationRoundProgress`     |      1:00:37 |             2,114 |
+| `TerminationRoundProgress`     |      1:00:37 |             2,140 |
 | `TerminationWithinRound`       |      0:09:10 |               773 |
-| `TerminationCascadeInvariants` |      0:39:42 |             1,269 |
+| `TerminationCascadeInvariants` |      0:39:42 |             1,275 |
 | `TerminationCascadeRegion`     |      1:08:16 |             1,524 |
-| `TerminationCascadeCore`       |      1:07:03 |             1,378 |
-| `TerminationCascade`           |      0:43:14 |             1,049 |
+| `TerminationCascadeCore`       |      1:07:03 |             1,400 |
+| `TerminationCascade`           |      0:43:14 |             1,056 |
 | `TerminationLockRetry`         |      0:11:58 |               284 |
 | `TerminationSelection`         |      0:02:50 |               188 |
-| `TerminationCrossRound`        |      0:15:10 |               604 |
+| `TerminationCrossRound`        |      0:15:10 |               607 |
 | `TerminationDominator`         |      0:11:42 |               408 |
 | `Termination`                  |      0:31:43 |               647 |
-| **Total**                      |  **6:33:29** |        **12,827** |
+| **Total**                      |  **6:33:29** |        **12,892** |
 
 Names above omit the `TendermintPartialSync` prefix.
 The final agreement refinement is also a dependency of the termination proof
