@@ -533,8 +533,8 @@ FaultyStep(p) ==
 (* Network: deliver broadcast messages to an honest validator. Batched --  *)
 (* one step delivers ALL messages currently available to p. The adversary  *)
 (* still controls WHEN delivery happens (the clock may advance with        *)
-(* messages undelivered), but the strict upper bound, delivery before the  *)
-(* paper deadline, is enforced on the clock (see Tick).                    *)
+(* messages undelivered), but the upper bound, delivery by the paper       *)
+(* deadline, is enforced on the clock (see Tick).                          *)
 (***************************************************************************)
 DeliveryDeadline(m) == (IF sentTime[m] >= GST THEN sentTime[m] ELSE GST) + Delta
 

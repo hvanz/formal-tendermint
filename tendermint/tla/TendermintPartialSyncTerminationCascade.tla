@@ -746,8 +746,9 @@ LEMMA EarlyPolkaNoNilStepL ==
 \* The window bound reads at the entry, and the polka sits at or below it.
       <4>8. now <= enteredAt[p][r] + Delta
         BY <1>ty, <2>le, <2>ty, <4>2
-\* The facts of TimerAboveWindow, one for each premise. The QED names only
-\* these facts. With the full context, the SMT backend failed on it.
+\* These steps give the premises of TimerAboveWindow that the context does
+\* not state directly. The QED names only the facts that it needs. With the
+\* full context, the SMT backend failed on it.
       <4>a. /\ now \in Nat /\ Delta \in Nat
             /\ TimeoutPrevote(r) \in Int /\ TimeoutPrevote(r) > 2 * Delta
         BY <1>ty

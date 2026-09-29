@@ -435,9 +435,10 @@ LEMMA TickEnabledFromGuards ==
 BY ExpandENABLED DEFS Tick, TypeOK, vars
 
 \* The deadline conjunct of Tick, as its own operator. It holds in the
-\* pre-state of each Tick. The maximal-progress ceilings read it there: a
-\* message dated at or below T after GST is in every correct rcvd when a Tick
-\* leaves now = T + Delta (DeliveredAtTick in ...RoundProgress).
+\* pre-state of each Tick, and the maximal-progress ceilings read it there.
+\* Take a message dated at or below T after GST. When a Tick leaves
+\* now = T + Delta, the message is in every correct rcvd (DeliveredAtTick in
+\* ...RoundProgress).
 DeadlinesAhead == \A pm \in PendingDeliveries : now < DeliveryDeadline(pm[2])
 
 LEMMA TickGivesDeadlines ==

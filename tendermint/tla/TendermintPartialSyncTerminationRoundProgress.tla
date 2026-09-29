@@ -1273,8 +1273,8 @@ THEOREM DeliverRegionBreaks ==
 (*   a fresh activation carries sentTime = now, and it is therefore not    *)
 (*   old. Each fair Deliver empties the share of one validator. Once the   *)
 (*   frontier is empty, the gate is open. A pending message that is not    *)
-(*   old was activated AT now, and its deadline is at least now + Delta >= *)
-(*   now + 2.                                                              *)
+(*   old was activated AT now. Its deadline is at least now + Delta, which *)
+(*   is above now because Delta > 0.                                       *)
 (***************************************************************************)
 
 \* c is missing a message that was activated STRICTLY before now.
@@ -2055,15 +2055,14 @@ THEOREM PrevoteDeadlineNotPassedInv == ASSUME Spec PROVE []PrevoteDeadlineNotPas
 <1> QED
   BY <1>1, <1>3, PTL
 
-\* ---- Item A: the Gossip property as an INVARIANT
-\* -------------------------- Base's DeliverWithinDelta is a LEADS-TO, which
-\* is the wrong shape for a state-predicate argument, so the delivery bound
-\* is re-derived here as an ordinary invariant. Tick's own third conjunct
-\* makes it hold in the post-state, so the clock can reach a pending
-\* message's deadline, but it cannot pass it. Consumed as: a post-GST message
-\* sits in EVERY correct validator's rcvd once the clock is above sentTime +
-\* Delta. The strict form at sentTime + Delta itself is DeadlinesAhead, in
-\* the pre-state of a Tick.
+\* ---- Item A: the Gossip property as an INVARIANT ----------------------
+\* Base's DeliverWithinDelta is a LEADS-TO, which is the wrong shape for a
+\* state-predicate argument. So the delivery bound is re-derived here as an
+\* ordinary invariant. Tick's own third conjunct makes it hold in the
+\* post-state. So the clock can reach a pending message's deadline, but it
+\* cannot pass it. Consumed as: a post-GST message sits in EVERY correct
+\* validator's rcvd once the clock is above sentTime + Delta. The strict form
+\* at sentTime + Delta itself is DeadlinesAhead, in the pre-state of a Tick.
 GossipDeadline ==
   \A pm \in PendingDeliveries : now <= DeliveryDeadline(pm[2])
 
@@ -2741,7 +2740,8 @@ BY PolkaBack, SentByBack DEFS B!Range, Justified, Rounds, ValuesOrNil
 \*  the clock is above T + Delta. Its DeliveryDeadline is at most T + Delta,
 \*  and GossipDeadline keeps the clock at or below the deadline of anything
 \*  that is still pending. DeliveredAtTick is the form at T + Delta itself.
-\*  These two lemmas are the places where the >= GST guard is spent.
+\*  No proof cites this lemma now. The ceilings cite DeliveredAtTick, which
+\*  is the one place where the >= GST guard is spent.
 LEMMA DeliveredByDeadline ==
   ASSUME TypeOK, GossipDeadline, NEW c \in Honest, NEW m \in Message, m \in sent,
          NEW T \in Int, T >= GST, sentTime[m] <= T, now > T + Delta

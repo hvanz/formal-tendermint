@@ -1304,12 +1304,11 @@ LEMMA NilPrecommitGivesEscape ==
   BY <1>1, <1>2, <1>3
 
 -----------------------------------------------------------------------------
-\* The two Tick cases. A Tick freezes the pool, and its maximal-progress
-\* guard says that no correct validator can compute, and its deadline
-\* conjunct says that no message is pending at its deadline, so both lemmas
-\* run entirely in the pre-state. Their conclusions name sent and sentTime
-\* only, so the step lemma carries them across the Tick by monotonicity
-\* alone.
+\* The two Tick cases. A Tick freezes the pool. Its maximal-progress guard
+\* says that no correct validator can compute. Its deadline conjunct says
+\* that no message is pending at its deadline. So both lemmas run entirely
+\* in the pre-state. Their conclusions name sent and sentTime only, so the
+\* step lemma carries them across the Tick by monotonicity alone.
 \*
 \* Clause P at the one instant the clock can break it. Five positions of a
 \* correct validator, and each one gives the prevote, gives the escape, or

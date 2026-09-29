@@ -57,20 +57,21 @@ Termination == TerminationConditions => (\A p \in Honest : <>(decision[p] # nil)
 `TerminationConditions` is `EveryHonestProposesAgain`. For every round bound,
 each honest validator is the proposer of some later round. A Byzantine proposer
 can stay silent, so the proof cannot use one honest proposer round only. The
-proof uses no timeout margin assumption. Lemma 7 selects a round r > GST with
-r >= 2 * Delta, where each timeout of round r is above 2 * Delta.
+proof uses no timeout margin assumption. Lemma 7 selects a round `r > GST` with
+`r >= 2 * Delta`, where each timeout of round `r` is above `2 * Delta`.
 
 The Lemma 5 hypotheses have one conjunct more than the paper. The first
-correct entry into round r is at or after `GST + TimeoutPrecommit(r - 1)`.
-Then the entry spread of round r is `Delta`. Lemma 7 proves this conjunct at
-every round r > GST. The model `TendermintPartialSyncTerminationEntrySpreadMC`
+correct entry into round `r` is at or after `GST + TimeoutPrecommit(r - 1)`.
+Then the entry spread of round `r` is `Delta`. Lemma 7 proves this conjunct at
+every round `r > GST`. The model `TendermintPartialSyncTerminationEntrySpreadMC`
 shows a round with `t > GST` alone that cannot decide.
 
 `Delta` is the paper's Δ. After GST, a message sent at time t reaches every
-correct validator by `max(t, GST) + Delta`, because `Tick` may reach the
-deadline of a pending message but may not pass it. The only assumption on
-`Delta` is `Delta > 0`. With `Delta = 0`, a message sent at the current time
-blocks `Tick`, and a faulty validator that sends without end stops the clock.
+correct validator by `max(t, GST) + Delta`. The reason is that `Tick` may
+reach the deadline of a pending message, but it may not pass it. The only
+assumption on `Delta` is `Delta > 0`. With `Delta = 0`, a message sent at the
+current time blocks `Tick`, and a faulty validator that sends without end
+stops the clock.
 
 The termination proof reuses the safety results.
 `TendermintPartialSyncTerminationBase` extends
