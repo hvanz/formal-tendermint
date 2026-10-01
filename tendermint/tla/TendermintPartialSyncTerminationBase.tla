@@ -14,12 +14,13 @@ EXTENDS TendermintPartialSyncRefinement, NaturalsInduction, FiniteSetTheorems, T
 (* No global assumption about timing is necessary here. The specification  *)
 (* exposes the three distinct timeouts of the paper, which are             *)
 (* TimeoutPropose, TimeoutPrevote and TimeoutPrecommit. Condition 4 of     *)
-(* paper Lemma 5 is therefore carried VERBATIM, as a hypothesis of each    *)
-(* theorem. See Lemma5Hyp below. That condition is timeoutPropose(r) >     *)
-(* 2*Delta + timeoutPrecommit(r-1), timeoutPrevote(r) > 2*Delta, and       *)
-(* timeoutPrecommit(r) > 2*Delta. It is not folded into one global         *)
-(* assumption TDelta > 2*Delta. Layer 4d, which is the selection of the    *)
-(* good round, discharges it when it picks the deciding round.             *)
+(* paper Lemma 5 is a hypothesis of each theorem, as Lemma5Timeouts in     *)
+(* Lemma5Hyp below. It needs each timeout of round r to be above 2*Delta.  *)
+(* The paper also adds timeoutPrecommit(r-1) to the bound of the propose   *)
+(* timeout. The late-entry conjunct of Lemma5Hyp replaces that term.       *)
+(* Condition 4 is not folded into one global assumption TDelta > 2*Delta.  *)
+(* The selection of the good round discharges it, because it picks a round *)
+(* r >= 2*Delta (TimeoutsSufficientBeyondL).                               *)
 (***************************************************************************)
 
 (***************************************************************************)
@@ -64,10 +65,9 @@ FirstToEnter(p, r) ==
 \*   validators abstain. The cardinality clause "< f+1" is therefore violable
 \*   in that branch.
 \*
-\*  The paper-faithful defense against an early decision is instead the
-\*  temporal fact NoDecisionBelow(r). It is threaded through WithinRound and
-\*  through the TerminationThm composition, and it is discharged there from
-\*  ~AllDecide.
+\*  The defense against an early decision is instead the conclusion of Lemma
+\*  5. Its first disjunct is SomeCorrectDecided, so the cascade proof can
+\*  assume []~SomeCorrectDecided (Lemma5CascadeUnderNoDecision in ...Cascade).
 \*
 \* The late entry. The entry is at or after GST + TimeoutPrecommit(r - 1).
 \* Then the round-(r - 1) certificate of the entry is sent at or after GST,
@@ -577,9 +577,8 @@ BY DEFS HasDecided, Deliver, FaultyStep, HonestNext, HonestStep, Next, OnPrecomm
 (* If every honest validator has voted v at r, then the quorum predicate   *)
 (* over the global pool holds. The witness is the all-honest quorum of     *)
 (* 2f+1 that QuorumAvailable supplies. It lies inside Honest, and          *)
-(* therefore inside the set of the senders of v at r. These are the        *)
-(* cascade stages c and e of the Layer-3 table of the ADR. They are kept   *)
-(* non-temporal, so that the WF1 staircase only has to chain them.         *)
+(* therefore inside the set of the senders of v at r. No proof in the      *)
+(* termination modules cites these two lemmas now.                         *)
 (***************************************************************************)
 LEMMA AllHonestPrevoteQuorum ==
   ASSUME NEW v \in ValuesOrNil, NEW r \in Rounds,

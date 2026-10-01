@@ -8,14 +8,14 @@
 (* This is the COMPOSITION module of the termination lattice. The lattice  *)
 (* is split into modules, so that tlapm can check them in parallel and     *)
 (* incrementally. See the `termination` targets of the Makefile, and       *)
-(* ARCHITECTURE.md. This module EXTENDS the independent middle modules,    *)
+(* termination.md. This module EXTENDS the independent middle modules,     *)
 (* and it assembles TerminationThm.                                        *)
 (* - TendermintPartialSyncTerminationBase holds Layers 0 to 2. Those are   *)
 (*   safety, the facts about the clock and the latches, the invariants     *)
 (*   about the messages, the decision and the delivery, and HonestFinite.  *)
 (*   It EXTENDS TendermintPartialSyncRefinement, so the discharged safety  *)
-(*   results are in scope by name throughout. Those results are InvProof,  *)
-(*   and the Mono* and SentExtend lemmas.                                  *)
+(*   results are in scope by name throughout. Examples are InvProof and    *)
+(*   SentExtend.                                                           *)
 (* - TendermintPartialSyncTerminationWithinRound holds the within-round    *)
 (*   safety support for the repaired case split of paper Lemma 5.          *)
 (* - TendermintPartialSyncTerminationCascade holds the quantitative        *)
@@ -58,16 +58,16 @@ EXTENDS TendermintPartialSyncTerminationDominator,
 \* Also rcvd \subseteq sent, so the whole certificate sits in the global pool
 \* `sent`, which is CertInSent. The certificate is message-latched, so it
 \* stays there. `Deliver` is BATCHED, so one Deliver(c) hands the entire
-\* certificate to any correct c, which is CertToOne. Each correct validator
-\* that is still undecided then has OnPrecommitQuorumValue enabled, which is
-\* EnabledDecide, and it decides by WF, which is CertDecideOne. A lift over
-\* the finite set Honest turns the two steps for each correct validator into
-\* "every correct validator decides", which is CertPropagatesAll. No
-\* reachability of the clock or of GST is necessary. Neither Deliver nor the
-\* decide action is gated on the clock, and eventual delivery is enough.
-\* Bounded delivery is not necessary, because a sent message always has
-\* sentTime <= now, which is SentTimeLeNow. Deliver(c) therefore stays enabled
-\* until it fires.
+\* certificate to any correct c. That is the delivery WF1, with CertDeliverAch
+\* and the CertBox* legs. Each correct validator that is still undecided then
+\* has OnPrecommitQuorumValue enabled, which is EnabledDecide. It decides by
+\* WF, which is the decide WF1 with the CertDec* legs. A lift over the finite
+\* set Honest turns the two steps for each correct validator into "every
+\* correct validator decides", which is CertPropagatesAll. No reachability of
+\* the clock or of GST is necessary. Neither Deliver nor the decide action is
+\* gated on the clock, and eventual delivery is enough. Bounded delivery is
+\* not necessary, because a sent message always has sentTime <= now, which is
+\* SentTimeLeNow. Deliver(c) therefore stays enabled until it fires.
 \* ===========================================================================
 \*
 \* The precommit certificate for (v, r) present in the global pool `sent`:
@@ -171,9 +171,8 @@ LEMMA CertAtStepL ==
   BY <1>1, <1>2 DEF CertAt
 
 \* ---- Delivery WF1: one batched Deliver(c) hands c the whole certificate ----
-\* This mirrors Lemma6MissingEvidenceMessage and Lemma6DeliverEvidenceSome. It
-\* is for a precommit certificate instead, and it carries no bound on now or
-\* on GST, because delivery only needs to be eventual.
+\* The certificate is a precommit certificate. The lemmas carry no bound on
+\* now or on GST, because delivery only needs to be eventual.
 LEMMA CertMissingMsg ==
   ASSUME TypeOK, NEW c \in Honest, NEW v \in Values, NEW r \in Rounds,
          CertInSent(v, r), ~CertAt(c, v, r)
@@ -1014,7 +1013,8 @@ THEOREM Lemma7Selection ==
 
 \* ---- Final composition: Spec => Termination, paper Lemma 7 ---------------
 \* This theorem contains temporal composition only. Every ingredient it cites
-\* is proved, so Termination holds under the three environment premises alone.
+\* is proved, so Spec alone gives Termination. The premise of Termination is
+\* TerminationConditions.
 THEOREM TerminationThm == Spec => Termination
 <1> SUFFICES ASSUME Spec, TerminationConditions
              PROVE  \A p \in Honest : <>HasDecided(p)

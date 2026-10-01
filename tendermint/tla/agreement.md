@@ -115,7 +115,7 @@ and application execution are outside the agreement theorem.
 
 ## Verification
 
-From the repository root:
+From this directory:
 
 ```bash
 make agreement

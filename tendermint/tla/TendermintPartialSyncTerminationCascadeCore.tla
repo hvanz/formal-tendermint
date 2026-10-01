@@ -710,8 +710,7 @@ LEMMA NilPrevoteGivesBlocking ==
 (* Item 13. CascadeCore, three clauses and one joint induction.            *)
 (*                                                                         *)
 (*    Clause P is anchored at the justified proposal, clause Q at the      *)
-(*    polka. The section "the failure modes, enumerated" of the plan holds *)
-(*    the reason. A proposal anchor loses the case where a correct         *)
+(*    polka. A proposal anchor for clause Q loses the case where a correct *)
 (*    validator leaves r early. The anchor cannot be raised without a      *)
 (*    raise of the deadline of the clause. A polka anchor also gives two   *)
 (*    more benefits. PrevoteJustified reads the justification off any      *)
@@ -941,8 +940,8 @@ LEMMA CoreGivesQuorum ==
   DEFS CascadeEscape, PrecommitQuorumFor
 
 \*  The two readings composed. A justified anchor with two gossip delays of
-\*  slack gives the escape outright. Mode 2 and mode 3 both rest on this
-\*  lemma.
+\*  slack gives the escape outright. ArmingQuorumGivesEscape, the
+\*  prevote-timeout case, uses this lemma.
 LEMMA CoreJustifiedGivesEscape ==
   ASSUME TypeOK, NEW p \in Honest, NEW r \in Rounds, NEW v \in Values,
          NEW T \in Nat, CascadeCore(p, r),
@@ -964,11 +963,11 @@ LEMMA CoreJustifiedGivesEscape ==
   BY <1>1, <1>2
 
 -----------------------------------------------------------------------------
-\* Row 9 of the fact map, the first-to-leave argument. A correct validator
-\* above r precommitted at r a whole TimeoutPrecommit(r) ago. Clause N makes
-\* that precommit a value precommit, PrecommitBacked dates the polka behind it
-\* that early, and clause Q at that anchor gives the quorum. No minimum over
-\* the leavers is needed: the evidence of one leaver closes the case.
+\* The first-to-leave argument. A correct validator above r precommitted at r
+\* a whole TimeoutPrecommit(r) ago. Clause N makes that precommit a value
+\* precommit, PrecommitBacked dates the polka behind it that early, and clause
+\* Q at that anchor gives the quorum. No minimum over the leavers is needed:
+\* the evidence of one leaver closes the case.
 LEMMA AboveGivesEscape ==
   ASSUME TypeOK, SentTimeLeNow, EnteredAtLeNow, EnteredCurrentRound,
          CrossingBacked, PrecommitBacked, PrevoteJustified, PrevoteOncePerRound,
@@ -1197,12 +1196,12 @@ LEMMA PrevoteValueIsProposed ==
   BY <1>2 DEF HonestProposalUnique
 
 -----------------------------------------------------------------------------
-\*  Mode 2's core. A dated any-value prevote quorum at r, whose date is a
-\*  whole TimeoutPrevote(r) below the clock, gives the escape. A correct
-\*  member of the quorum either prevoted nil, which gives the lock, or its
-\*  prevote justifies the proposal at the arming date Tq. In the second case
-\*  clause P builds the polka there. Tq is at or after the entry, so the
-\*  ceiling is within Delta of Tq.
+\*  The core of the prevote-timeout case. A dated any-value prevote quorum at
+\*  r, whose date is a whole TimeoutPrevote(r) below the clock, gives the
+\*  escape. A correct member of the quorum either prevoted nil, which gives
+\*  the lock, or its prevote justifies the proposal at the arming date Tq. In
+\*  the second case clause P builds the polka there. Tq is at or after the
+\*  entry, so the ceiling is within Delta of Tq.
 LEMMA ArmingQuorumGivesEscape ==
   ASSUME TypeOK, SentTimeLeNow, PrevoteJustified, PrevoteOncePerRound,
          HonestProposalUnique, NilPrevoteInWindow, RoundVoteAfterEntry,
@@ -1780,7 +1779,7 @@ LEMMA CascadeCoreStepL ==
       <4> QED
         BY <1>q, <2>nd, <4>3, <4>4, NilPrevoteGivesBlocking
     \* The fired prevote timer was armed by a quorum a whole TimeoutPrevote(r)
-    \* earlier. That is mode 2, and ArmingQuorumGivesEscape holds it.
+    \* earlier. ArmingQuorumGivesEscape covers this case.
     <3>5. CASE OnTimeoutPrevote(c)
       <4>1. timer[c]["prevote"] # OFF /\ now >= timer[c]["prevote"]
         BY <3>5 DEF OnTimeoutPrevote

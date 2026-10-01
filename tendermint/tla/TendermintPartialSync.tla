@@ -154,7 +154,7 @@ WeakQuorum == { W \in SUBSET Validators : Cardinality(W) >= f + 1 }
 
 \* ---- Quorum facts (hold by pigeonhole for the sizing above) -------------
 \* Re-stated as ASSUMEs (TLC discharges them concretely at f = 1; a TLAPS
-\* lemma deriving them from the cardinality is deferred, see ARCHITECTURE).
+\* lemma deriving them from the cardinality is deferred, see termination.md).
 \* SAFETY facts, inherited from TendermintByzantine (Lamport's BQA):
 ASSUME ByzQuorumIntersection ==
   \A Q1, Q2 \in ByzQuorum : Q1 \cap Q2 \cap Honest # {}

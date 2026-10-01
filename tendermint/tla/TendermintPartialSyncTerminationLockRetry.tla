@@ -116,9 +116,9 @@ BY DeltaType, T0PrecommitType, TDeltaType DEFS Rounds, TimeoutPrecommit
 \* The escape is itself a round bound. The sender of the withholding era was
 \* AT round lr at that instant, and RoundBelowNow bounds a correct round by
 \* the clock. The residue is therefore lr < GST. Both disjuncts are CONSTANT
-\* ceilings, and a constant is all that the retry consumes. The disruptive
-\* lock rounds strictly increase, so any constant ceiling bounds the number of
-\* disruptions.
+\* ceilings, and a constant is all that the retry consumes. A constant ceiling
+\* makes the set of low pairs finite, and each disruption uses a pair that no
+\* earlier disruption used.
 LEMMA DisruptionRoundCeilingWithGST ==
   ASSUME NEW lr \in Rounds, TimeoutPrecommit(lr) <= Delta \/ lr < GST
   PROVE  lr <= Delta + GST
